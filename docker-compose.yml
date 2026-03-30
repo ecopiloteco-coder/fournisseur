@@ -1,0 +1,12 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: ecopilot-fornisseur-admin
+    ports:
+      - "3005:80"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production

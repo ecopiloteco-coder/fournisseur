@@ -1,0 +1,19 @@
+/* EcoPilot Fournisseur Portal - Custom CSS */
+/* Bootstrap is loaded via public/assets/css/styles.css in index.html */
+/* This file adds any remaining overrides */
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Flaticon icon alignment fix */
+.fi {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Animate.css smooth integration */
+.animate__animated {
+  animation-duration: 0.4s;
+}
