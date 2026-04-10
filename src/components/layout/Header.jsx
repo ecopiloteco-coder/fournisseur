@@ -1,13 +1,22 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useNotifications } from '../../shared/providers/NotificationProvider'
 import { useAuth } from '../../shared/providers/AuthContext'
+import { MessagingPanel } from '../../shared/components/MessagingPanel'
+import { NotificationsPanel } from '../../shared/components/NotificationsPanel'
 
 export default function Header({ onToggleSidebar }) {
     const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
     const { user, logout } = useAuth()
+    const [showMessaging, setShowMessaging] = useState(false)
+    const [showNotifications, setShowNotifications] = useState(false)
+    
+    // Count unread messages (hardcoded for now, can be connected to actual messaging system)
+    const unreadMessagesCount = 3
 
     return (
-        <header className="app-header">
+        <>
+            <header className="app-header">
             <div className="app-header-inner">
                 <button
                     className="app-toggler"
@@ -19,28 +28,6 @@ export default function Header({ onToggleSidebar }) {
                     <span></span>
                     <span></span>
                 </button>
-                <div className="app-header-start d-none d-md-flex">
-                    <form className="d-flex align-items-center h-100 w-lg-250px w-xxl-300px position-relative" action="#">
-                        <button type="button" className="btn btn-sm border-0 position-absolute start-0 ms-3 p-0">
-                            <i className="fi fi-rr-search"></i>
-                        </button>
-                        <input
-                            type="text"
-                            className="form-control rounded-5 ps-5"
-                            placeholder="Search anything's"
-                            data-bs-toggle="modal"
-                            data-bs-target="#searchResultsModal"
-                        />
-                    </form>
-                    <ul className="navbar-nav gap-4 flex-row d-none d-xxl-flex">
-                        <li className="nav-item">
-                            <Link className="nav-link" to="/analytics">Reports &amp; Analytics</Link>
-                        </li>
-                        <li className="nav-item">
-                            <Link className="nav-link" to="/pages/faq">Help</Link>
-                        </li>
-                    </ul>
-                </div>
                 <div className="app-header-end">
                     <div className="px-lg-3 px-2 ps-0 d-flex align-items-center">
                         <div className="dropdown">
@@ -75,68 +62,28 @@ export default function Header({ onToggleSidebar }) {
                     </div>
                     <div className="vr my-3"></div>
                     <div className="d-flex align-items-center gap-sm-2 gap-0 px-lg-4 px-sm-2 px-1">
-                        <Link to="/email/inbox" className="btn btn-icon btn-action-gray rounded-circle waves-effect waves-light position-relative">
+                        <button 
+                            onClick={() => setShowMessaging(true)}
+                            className="btn btn-icon btn-action-gray rounded-circle waves-effect waves-light position-relative"
+                            type="button"
+                        >
                             <i className="fi fi-rr-envelope"></i>
-                            <span className="position-absolute top-0 end-0 p-1 mt-1 me-1 bg-danger border border-3 border-light rounded-circle">
-                                <span className="visually-hidden">New alerts</span>
-                            </span>
-                        </Link>
-                        <div className="dropdown text-end">
-                            <button
-                                type="button"
-                                className="btn btn-icon btn-action-gray rounded-circle waves-effect waves-light"
-                                data-bs-toggle="dropdown"
-                                data-bs-auto-close="outside"
-                                aria-expanded="true"
-                            >
-                                <i className="fi fi-rr-bell"></i>
-                                {unreadCount > 0 && (
-                                    <span className="position-absolute top-0 end-0 p-1 mt-1 me-1 bg-danger border border-2 border-light rounded-circle"></span>
-                                )}
-                            </button>
-                            <div className="dropdown-menu dropdown-menu-lg-end p-0 w-350px mt-2 overflow-hidden shadow-lg border-0 rounded-4">
-                                <div className="px-3 py-3 border-bottom d-flex justify-content-between align-items-center bg-light">
-                                    <h6 className="mb-0 fw-bold">Notifications <span className="badge badge-sm rounded-pill bg-primary ms-2">{unreadCount}</span></h6>
-                                    <button className="btn btn-link btn-sm p-0 text-decoration-none" onClick={markAllAsRead}>Mark all read</button>
-                                </div>
-                                <div className="p-0" style={{ maxHeight: 350, overflowY: 'auto' }} data-simplebar>
-                                    <ul className="list-group list-group-flush">
-                                        {notifications.length > 0 ? (
-                                            notifications.map(n => (
-                                                <li
-                                                    key={n.id}
-                                                    className={`list-group-item list-group-item-action border-0 px-3 py-3 ${!n.read ? 'bg-primary bg-opacity-05' : ''}`}
-                                                    onClick={() => markAsRead(n.id)}
-                                                    role="button"
-                                                >
-                                                    <div className="d-flex">
-                                                        <div className={`avatar avatar-xs rounded-circle bg-${n.type}-subtle text-${n.type} fs-6 flex-shrink-0`}>
-                                                            <i className={`fi ${n.type === 'primary' ? 'fi-rr-star' : n.type === 'warning' ? 'fi-rr-exclamation' : 'fi-rr-info'}`}></i>
-                                                        </div>
-                                                        <div className="ms-3 flex-grow-1 position-relative">
-                                                            <div className="d-flex justify-content-between align-items-center mb-1">
-                                                                <h6 className="mb-0 small fw-bold">{n.title}</h6>
-                                                                <small className="text-muted" style={{ fontSize: '10px' }}>{n.time}</small>
-                                                            </div>
-                                                            <p className="text-muted small mb-0 lh-sm pe-2">{n.desc}</p>
-                                                            {!n.read && <span className="position-absolute end-0 top-50 translate-middle-y p-1 bg-primary rounded-circle"></span>}
-                                                        </div>
-                                                    </div>
-                                                </li>
-                                            ))
-                                        ) : (
-                                            <div className="p-5 text-center text-muted">
-                                                <i className="fi fi-rr-bell-slash fs-1 d-block mb-3 opacity-25"></i>
-                                                No notifications
-                                            </div>
-                                        )}
-                                    </ul>
-                                </div>
-                                <div className="p-2 border-top bg-light">
-                                    <Link to="/notifications" className="btn btn-link btn-sm w-100 text-primary fw-bold text-decoration-none">View all history</Link>
-                                </div>
-                            </div>
-                        </div>
+                            {unreadMessagesCount > 0 && (
+                                <span className="position-absolute top-0 end-0 p-1 mt-1 me-1 bg-danger border border-2 border-light rounded-circle">
+                                    <span className="visually-hidden">New messages</span>
+                                </span>
+                            )}
+                        </button>
+                        <button
+                            onClick={() => setShowNotifications(true)}
+                            type="button"
+                            className="btn btn-icon btn-action-gray rounded-circle waves-effect waves-light position-relative"
+                        >
+                            <i className="fi fi-rr-bell"></i>
+                            {unreadCount > 0 && (
+                                <span className="position-absolute top-0 end-0 p-1 mt-1 me-1 bg-danger border border-2 border-light rounded-circle"></span>
+                            )}
+                        </button>
                         <Link to="/calendar" className="btn btn-icon btn-action-gray rounded-circle waves-effect waves-light">
                             <i className="fi fi-rr-calendar"></i>
                         </Link>
@@ -177,5 +124,8 @@ export default function Header({ onToggleSidebar }) {
                 </div>
             </div>
         </header>
+            <MessagingPanel isOpen={showMessaging} onClose={() => setShowMessaging(false)} />
+            <NotificationsPanel isOpen={showNotifications} onClose={() => setShowNotifications(false)} />
+        </>
     )
 }

@@ -19,7 +19,7 @@ export default function FAQ() {
             category: 'Réponses aux Appels d\'Offres',
             items: [
                 { q: 'Comment répondre à une nouvelle demande de chiffrage ?', a: 'Dès qu\'un projet correspond à votre expertise, une notification vous est envoyée. Accédez à « Demandes de Chiffrage », examinez les lots et soumettez vos tarifs directement en ligne.' },
-                { q: 'Puis-je modifier un devis après l\'avoir envoyé ?', a: 'Tant que la date limite de remise n\'est pas dépassée, vous pouvez mettre à jour vos tarifs dans la section « Mes Devis Envoyés ». Après l\'échéance, tout changement devra être validé par le gestionnaire du projet.' }
+                { q: 'Puis-je modifier un devis après l\'avoir envoyé ?', a: 'Tant que la date limite de remise n\'est pas dépassée, vous pouvez mettre à jour vos tarifs dans la section « Suivi de Projet ». Après l\'échéance, tout changement devra être validé par le gestionnaire du projet.' }
             ]
         },
         {

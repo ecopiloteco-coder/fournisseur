@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../shared/providers/AuthContext';
-import SidebarRight from '../../components/layout/SidebarRight';
 import Header from '../../components/layout/Header';
 import Sidebar from '../../components/layout/Sidebar';
 
@@ -45,9 +44,6 @@ export function FournisseurLayout() {
 
       {/* ── Sidebar gauche du template (mêmes boutons/sections) ── */}
       <Sidebar isOpen={sidebarOpen} />
-
-      {/* ── Right quick actions bar (Task, FAQ, Calendar, Settings) ── */}
-      <SidebarRight />
 
       {/* ── Main Content ── */}
       <main className="app-wrapper">

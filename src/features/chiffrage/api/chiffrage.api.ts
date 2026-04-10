@@ -5,7 +5,7 @@ export interface ProjetFournisseurResponse {
   publicId: string;
   nomProjet: string;
   projetId: number;
-  status: 'en_attente' | 'en_cours' | 'termine';
+  status: 'en attente' | 'en_cours' | 'termine' | 'archive';
   userEntreprise: string;
   deadline: string;
   prixTotal: number;
@@ -61,15 +61,28 @@ const getAuthHeaders = () => {
 export async function fetchDemandesParEntreprise(userEntreprise: string): Promise<ProjetFournisseurResponse[]> {
   const baseUrl = getBackendURL();
   const url = `${baseUrl}/api/projet-fournisseur/projets?userEntreprise=${encodeURIComponent(userEntreprise)}`;
+  
+  console.log('[API] Fetching demandes from:', url);
+  
   const response = await fetch(url, { headers: getAuthHeaders() });
+  
+  console.log('[API] Response status:', response.status);
   
   if (!response.ok) {
     if (response.status === 401) throw new Error('Non autorisé. Veuillez vous reconnecter.');
+    const errorText = await response.text();
+    console.error('[API] Error response:', errorText);
     throw new Error('Erreur lors de la récupération des demandes de chiffrage.');
   }
   
   const result = await response.json();
-  return result.data || [];
+  console.log('[API] Response data:', result);
+  
+  // Handle both { data: [...] } and { success, data: [...] } formats
+  const data = result.data || result || [];
+  console.log('[API] Extracted projects:', data);
+  
+  return Array.isArray(data) ? data : [];
 }
 
 export async function fetchDemandeById(id: number): Promise<ProjetFournisseurResponse> {

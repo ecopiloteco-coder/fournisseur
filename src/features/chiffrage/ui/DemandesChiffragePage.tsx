@@ -6,7 +6,7 @@ import { fetchDemandesParEntreprise } from '../api/chiffrage.api';
 const COLUMNS = [
   { title: 'Nouveaux', status: 'Nouveau', statusClass: 'primary' },
   { title: 'En cours', status: 'En cours', statusClass: 'warning' },
-  { title: 'À vérifier', status: 'À vérifier', statusClass: 'info' },
+  { title: 'Envoyé', status: 'Soumis', statusClass: 'info' },
   { title: 'Terminé', status: 'Terminé', statusClass: 'success' },
 ];
 
@@ -25,25 +25,35 @@ export function DemandesChiffragePage() {
   useEffect(() => {
     const loadDemandes = async () => {
       if (!user || (!user.keycloakId && !user.entrepriseId)) {
+        console.warn('[Demandes] No user or entrepriseId/keycloakId:', { user });
         setIsLoading(false);
         return;
       }
       try {
         setIsLoading(true);
-        const data = await fetchDemandesParEntreprise(user.keycloakId || String(user.entrepriseId));
+        const userId = user.keycloakId || String(user.entrepriseId);
+        console.log('[Demandes] Loading projects for user:', userId);
+        
+        const data = await fetchDemandesParEntreprise(userId);
+        console.log('[Demandes] Received projects:', data);
+        
         const mapped = data.map(d => ({
           id: d.id,
           displayId: `PRJ-${d.projetId}`,
+          cardRef: `MT - ${String(d.projetId || d.id || 0).padStart(3, '0')}`,
           name: d.nomProjet,
+          owner: (d as any).contactName || (d as any).nomContact || (d as any).responsable || 'Noah Yannick',
           lot: 'Lots de consultation', // Simplified for list view
           date: d.deadline ? new Date(d.deadline).toLocaleDateString('fr-FR') : 'Non définie',
-          status: d.status === 'en_attente' ? 'Nouveau' : d.status === 'en_cours' ? 'En cours' : d.status === 'termine' ? 'Terminé' : (d.status === 'a_verifier' ? 'À vérifier' : 'Soumis'),
+          status: d.status === 'en attente' ? 'Nouveau' : d.status === 'en_cours' ? 'En cours' : d.status === 'termine' ? 'Terminé' : (d.status === 'archive' ? 'Archivé' : 'Soumis'),
           budget: d.prixTotal && d.prixTotal > 0 ? `${Number(d.prixTotal).toLocaleString('fr-FR')} €` : 'À chiffrer',
           articles: 0, // Placeholder
           isLate: d.deadline ? new Date(d.deadline) < new Date() && d.status !== 'termine' : false
         }));
+        console.log('[Demandes] Mapped projects:', mapped);
         setProjects(mapped);
       } catch (err: any) {
+        console.error('[Demandes] Error loading projects:', err);
         setError(err.message);
       } finally {
         setIsLoading(false);
@@ -138,27 +148,20 @@ export function DemandesChiffragePage() {
                     {colProjects.map(p => (
                       <div key={p.id} className="card shadow-sm border-0 mb-3 hover-shadow-lg card-action" style={{ borderRadius: '12px' }} data-id={p.id}>
                         <div className="card-body p-3">
-                          <div className="d-flex justify-content-between align-items-start mb-2">
-                            <h6 className="fw-bold text-dark mb-0 small text-start" style={{ lineHeight: '1.4', fontSize: '13px' }}>{p.name}</h6>
-                            <span className="badge bg-light text-primary border px-2 py-1 flex-shrink-0 ms-2" style={{ fontSize: '9px' }}>{p.displayId}</span>
-                          </div>
-                          <p className="text-muted mb-3 text-start d-flex align-items-center" style={{ fontSize: '11px' }}>
-                            <i className="fi fi-rr-layers me-1 text-primary"></i> {p.lot}
-                          </p>
-                          <div className="row g-0 mb-3 text-start bg-light rounded-3 p-2">
-                            <div className="col-6 border-end pe-2">
-                              <small className="text-muted d-block" style={{ fontSize: '10px' }}>Articles</small>
-                              <span className="fw-bold text-dark" style={{ fontSize: '12px' }}><i className="fi fi-rr-box-alt me-1 text-primary"></i>{p.articles}</span>
-                            </div>
-                            <div className="col-6 ps-2">
-                              <small className="text-muted d-block" style={{ fontSize: '10px' }}>Budget Est.</small>
-                              <span className="fw-bold text-dark" style={{ fontSize: '12px' }}>{p.budget}</span>
-                            </div>
-                          </div>
-                          <div className={`p-2 rounded-3 bg-white border d-flex align-items-center gap-2 w-100 mb-3 ${p.isLate ? 'border-danger' : 'border-light-subtle shadow-sm'}`}>
-                            <i className={`fi fi-rr-calendar-clock ${p.isLate ? 'text-danger' : 'text-warning'}`} style={{ fontSize: '14px' }}></i>
-                            <span className={`fw-bold ${p.isLate ? 'text-danger' : 'text-dark'}`} style={{ fontSize: '11px' }}>{p.date}</span>
-                            {p.isLate && <span className="ms-auto badge bg-danger text-white px-1" style={{ fontSize: '8px' }}>RETARD</span>}
+                          <small className="text-muted d-block mb-1" style={{ fontSize: '10px' }}>{p.cardRef || p.displayId}</small>
+                          <h6 className="fw-bold text-dark mb-2 text-start" style={{ lineHeight: '1.4', fontSize: '13px' }}>
+                            Demande de chiffrage - {p.name}
+                          </h6>
+                          <div className="d-flex flex-column gap-2 mb-3 text-start" style={{ fontSize: '12px' }}>
+                            <span className="text-muted d-flex align-items-center gap-2">
+                              <i className="fi fi-rr-user text-primary"></i> {p.owner}
+                            </span>
+                            <span className="text-muted d-flex align-items-center gap-2">
+                              <i className="fi fi-rr-box-alt text-primary"></i> {p.articles} Articles
+                            </span>
+                            <span className={`d-flex align-items-center gap-2 ${p.isLate ? 'text-danger fw-bold' : 'text-muted'}`}>
+                              <i className="fi fi-rr-hourglass-end text-primary"></i> {p.date}
+                            </span>
                           </div>
                           <div className="d-flex gap-2">
                             <button className="btn btn-sm btn-outline-warning flex-grow-1 fw-bold p-2"

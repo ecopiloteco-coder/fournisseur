@@ -10,31 +10,21 @@ const DemandCard = ({ project, onSignal }) => {
             data-id={project.id}
         >
             <div className="card-body p-3">
-                <div className="d-flex justify-content-between align-items-start mb-2">
-                    <h6 className="fw-bold text-dark mb-0 small text-start" style={{ lineHeight: '1.4', fontSize: '13px' }}>{project.name}</h6>
-                    <span className="badge bg-light text-primary border px-2 py-1 flex-shrink-0 ms-2" style={{ fontSize: '9px' }}>{project.id}</span>
-                </div>
-                <p className="text-muted mb-3 text-start d-flex align-items-center" style={{ fontSize: '11px' }}>
-                    <i className="fi fi-rr-layers me-1 text-primary"></i> {project.lot}
-                </p>
+                <small className="text-muted d-block mb-1" style={{ fontSize: '10px' }}>{project.cardRef || project.id}</small>
+                <h6 className="fw-bold text-dark mb-2 text-start" style={{ lineHeight: '1.4', fontSize: '13px' }}>
+                    Demande de chiffrage - {project.name}
+                </h6>
 
-                <div className="row g-0 mb-3 text-start bg-light rounded-3 p-2">
-                    <div className="col-6 border-end pe-2">
-                        <small className="text-muted d-block" style={{ fontSize: '10px' }}>Articles</small>
-                        <span className="fw-bold text-dark" style={{ fontSize: '12px' }}><i className="fi fi-rr-box-alt me-1 text-primary"></i> {project.articles}</span>
-                    </div>
-                    <div className="col-6 ps-2">
-                        <small className="text-muted d-block" style={{ fontSize: '10px' }}>Budget Est.</small>
-                        <span className="fw-bold text-dark" style={{ fontSize: '12px' }}>{project.budget}</span>
-                    </div>
-                </div>
-
-                <div className="d-flex align-items-center mb-3">
-                    <div className={`p-2 rounded-3 bg-white border d-flex align-items-center gap-2 w-100 ${project.isLate ? 'border-danger' : 'border-light-subtle shadow-sm'}`}>
-                        <i className={`fi fi-rr-calendar-clock ${project.isLate ? 'text-danger' : 'text-warning'}`} style={{ fontSize: '14px' }}></i>
-                        <span className={`fw-bold ${project.isLate ? 'text-danger' : 'text-dark'}`} style={{ fontSize: '11px' }}>{project.date}</span>
-                        {project.isLate && <span className="ms-auto badge bg-danger text-white px-1" style={{ fontSize: '8px' }}>RETARD</span>}
-                    </div>
+                <div className="d-flex flex-column gap-2 mb-3 text-start" style={{ fontSize: '12px' }}>
+                    <span className="text-muted d-flex align-items-center gap-2">
+                        <i className="fi fi-rr-user text-primary"></i> {project.owner || 'Noah Yannick'}
+                    </span>
+                    <span className="text-muted d-flex align-items-center gap-2">
+                        <i className="fi fi-rr-box-alt text-primary"></i> {project.articles} Articles
+                    </span>
+                    <span className={`d-flex align-items-center gap-2 ${project.isLate ? 'text-danger fw-bold' : 'text-muted'}`}>
+                        <i className="fi fi-rr-hourglass-end text-primary"></i> {project.date}
+                    </span>
                 </div>
 
                 <div className="d-flex gap-2 mt-auto">
@@ -90,11 +80,11 @@ export default function DemandesChiffrage() {
     const [signalType, setSignalType] = useState('retard_livraison')
 
     const [projects, setProjects] = useState([
-        { id: 'PRJ-2024-001', name: 'Rénovation Lycée Pasteur', lot: 'Lot 03 - Électricité', date: '2024-03-15', status: 'Nouveau', budget: '15,000 €', articles: 45, isLate: false },
-        { id: 'PRJ-2024-002', name: 'EHPAD Les Glycines', lot: 'Lot 12 - Peinture', date: '2024-03-20', status: 'En cours', budget: '8,500 €', articles: 12, isLate: false },
-        { id: 'PRJ-2024-003', name: 'Immeuble Le Quartz', lot: 'Lot 01 - Gros Oeuvre', date: '2024-03-10', status: 'Nouveau', budget: '120,000 €', articles: 156, isLate: true },
-        { id: 'PRJ-2024-004', name: 'Clinique du Parc', lot: 'Lot 05 - Plomberie', date: '2024-03-25', status: 'Soumis', budget: '42,000 €', articles: 88, isLate: false },
-        { id: 'PRJ-2024-005', name: 'Parking Gare Nord', lot: 'Lot 08 - Éclairage', date: '2024-03-05', status: 'Terminé', budget: '12,000 €', articles: 24, isLate: false },
+        { id: 'PRJ-2024-001', cardRef: 'MT - 001', owner: 'Noah Yannick', name: 'Rénovation Lycée Pasteur', lot: 'Lot 03 - Électricité', date: '2024-03-15', status: 'Nouveau', budget: '15,000 €', articles: 45, isLate: false },
+        { id: 'PRJ-2024-002', cardRef: 'MT - 002', owner: 'Noah Yannick', name: 'EHPAD Les Glycines', lot: 'Lot 12 - Peinture', date: '2024-03-20', status: 'En cours', budget: '8,500 €', articles: 12, isLate: false },
+        { id: 'PRJ-2024-003', cardRef: 'MT - 003', owner: 'Noah Yannick', name: 'Immeuble Le Quartz', lot: 'Lot 01 - Gros Oeuvre', date: '2024-03-10', status: 'Nouveau', budget: '120,000 €', articles: 156, isLate: true },
+        { id: 'PRJ-2024-004', cardRef: 'MT - 004', owner: 'Noah Yannick', name: 'Clinique du Parc', lot: 'Lot 05 - Plomberie', date: '2024-03-25', status: 'Soumis', budget: '42,000 €', articles: 88, isLate: false },
+        { id: 'PRJ-2024-005', cardRef: 'MT - 005', owner: 'Noah Yannick', name: 'Parking Gare Nord', lot: 'Lot 08 - Éclairage', date: '2024-03-05', status: 'Terminé', budget: '12,000 €', articles: 24, isLate: false },
     ])
 
     const columns = [

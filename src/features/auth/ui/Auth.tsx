@@ -145,9 +145,9 @@ export function Auth() {
   };
 
   return (
-    <div className="min-vh-100 d-flex align-items-center justify-content-center p-4" style={{ backgroundColor: '#f8f9fa' }}>
-      <div className="card shadow-lg border-0 w-100" style={{ maxWidth: '450px', borderRadius: '1rem' }}>
-        <div className="card-header bg-white text-center border-0 pt-5 pb-3">
+    <div className="min-vh-100 d-flex align-items-center justify-content-center p-4 bg-background">
+      <div className="card shadow-lg border-0 w-100 bg-card text-foreground" style={{ maxWidth: '450px', borderRadius: '1rem' }}>
+        <div className="card-header bg-card text-center border-0 pt-5 pb-3">
           <div className="d-flex justify-content-center mb-3">
             <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '60px', height: '60px' }}>
               <Building2 size={30} />

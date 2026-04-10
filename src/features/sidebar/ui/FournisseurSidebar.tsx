@@ -2,9 +2,9 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../shared/providers/AuthContext';
 import {
-  LayoutDashboard, ClipboardList, Send, Activity,
-  Package, TrendingUp, Users, Settings, CalendarDays, ListTodo,
-  HelpCircle, ChevronLeft, ChevronRight, Building2, LogOut, User,
+  LayoutDashboard, ClipboardList, Activity,
+  Package, TrendingUp, Users, Settings,
+  ChevronLeft, ChevronRight, Building2, LogOut,
 } from 'lucide-react';
 
 interface NavItem {
@@ -30,8 +30,7 @@ export const FOURNISSEUR_NAV: NavGroup[] = [
     group: 'Gestion des Affaires',
     items: [
       { label: 'Demandes de chiffrage', path: '/chiffrage/demandes', icon: <ClipboardList className="w-4 h-4" />, badge: '3' },
-      { label: 'Devis envoyés', path: '/chiffrage/devis', icon: <Send className="w-4 h-4" /> },
-      { label: 'Suivi des projets', path: '/suivi', icon: <Activity className="w-4 h-4" /> },
+      { label: 'Suivi de Projet', path: '/chiffrage/devis', icon: <Activity className="w-4 h-4" /> },
     ],
   },
   {
@@ -45,15 +44,7 @@ export const FOURNISSEUR_NAV: NavGroup[] = [
     group: 'Organisation',
     items: [
       { label: 'Mon équipe', path: '/equipe', icon: <Users className="w-4 h-4" /> },
-      { label: 'Paramètres', path: '/settings', icon: <Settings className="w-4 h-4" /> },
-    ],
-  },
-  {
-    group: 'Outils',
-    items: [
-      { label: 'Tâches', path: '/task-management', icon: <ListTodo className="w-4 h-4" /> },
-      { label: 'Calendrier', path: '/calendar', icon: <CalendarDays className="w-4 h-4" /> },
-      { label: 'Aide & FAQ', path: '/pages/faq', icon: <HelpCircle className="w-4 h-4" /> },
+      { label: 'Configuration', path: '/settings', icon: <Settings className="w-4 h-4" /> },
     ],
   },
 ];

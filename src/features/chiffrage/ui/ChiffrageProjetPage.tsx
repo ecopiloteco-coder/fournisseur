@@ -45,6 +45,7 @@ export function ChiffrageProjetPage() {
             unit: a.unite || 'U',
             qty: a.quantite || 0,
             price: a.prixUnitaire || 0,
+            discount: a.rabais || 0,
             status: a.prixUnitaire > 0 ? 'done' : 'pending',
             description: a.remarque || 'Aucune description technique spécifiée.',
             files: (a.fichiers || []).map(f => ({ name: f.nomFichier, size: `${(f.taille / 1024).toFixed(0)} KB`, url: f.url })),
@@ -117,6 +118,10 @@ export function ChiffrageProjetPage() {
     setArticles(a => a.map(art => art.id === artId ? { ...art, price: parseFloat(value) || 0, status: parseFloat(value) > 0 ? 'done' : 'pending' } : art));
   };
 
+  const handleDiscountChange = (artId: number, value: string) => {
+    setArticles(a => a.map(art => art.id === artId ? { ...art, discount: Math.max(0, Math.min(100, parseFloat(value) || 0)) } : art));
+  };
+
   const applyCatalogPrice = (artId: number, catalogPrice: number) => handlePriceChange(artId, String(catalogPrice));
 
   const filteredArticles = useMemo(() => articles.filter(a => {
@@ -133,7 +138,7 @@ export function ChiffrageProjetPage() {
     setIsSaving(true);
     try {
       for (const a of articles) {
-        await chiffrerArticle(a.id, { prixUnitaire: a.price, tva: 20, rabais: 0, remarque: '' });
+        await chiffrerArticle(a.id, { prixUnitaire: a.price, tva: 20, rabais: a.discount || 0, remarque: '' });
       }
       // Re-fetch to get updated server-side calculations
       const data = await fetchDemandeById(Number(id));
@@ -302,8 +307,10 @@ export function ChiffrageProjetPage() {
                     <th className="px-4 py-3" style={{ width: '120px' }}>Ref</th>
                     <th className="py-3">Article & Specs</th>
                     <th className="py-3 text-center">Quantité</th>
-                    <th className="py-3" style={{ width: '160px' }}>PU HT (€)</th>
-                    <th className="px-4 py-3 text-end" style={{ width: '160px' }}>Total HT</th>
+                    <th className="py-3" style={{ width: '170px' }}>Prix Unitaire HT</th>
+                    <th className="py-3" style={{ width: '140px' }}>Rabais</th>
+                    <th className="px-4 py-3 text-end" style={{ width: '160px' }}>Total HT (€)</th>
+                    <th className="px-4 py-3 text-center" style={{ width: '130px' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -334,10 +341,55 @@ export function ChiffrageProjetPage() {
                             </button>
                           )}
                         </td>
+                        <td>
+                          <div className="position-relative">
+                            <input
+                              type="number"
+                              className="form-control form-control-sm text-end fw-bold pe-4 bg-light border-0 rounded-3"
+                              value={a.discount === 0 ? '' : a.discount}
+                              placeholder="0.00"
+                              min={0}
+                              max={100}
+                              onChange={(e) => handleDiscountChange(a.id, e.target.value)}
+                            />
+                            <span className="position-absolute end-0 top-50 translate-middle-y me-2 text-muted" style={{ fontSize: '0.75rem' }}>%</span>
+                          </div>
+                        </td>
                         <td className="px-4 text-end">
                           <span className={`fw-extrabold ${a.price > 0 ? 'text-dark' : 'text-muted'}`}>
-                            {(a.qty * a.price).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+                            {(a.qty * a.price * (1 - (a.discount || 0) / 100)).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
                           </span>
+                        </td>
+                        <td className="px-4 text-center">
+                          <div className="d-inline-flex align-items-center gap-2">
+                            <button
+                              type="button"
+                              className="btn btn-sm p-0 border-0 bg-transparent text-warning"
+                              title="Signaler"
+                            >
+                              <i className="fi fi-rr-exclamation" />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm p-0 border-0 bg-transparent text-primary"
+                              title="Voir le document"
+                              onClick={() => {
+                                if (a.files && a.files[0]?.url) {
+                                  window.open(a.files[0].url, '_blank', 'noopener,noreferrer');
+                                }
+                              }}
+                            >
+                              <i className="fi fi-rr-link" />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm p-0 border-0 bg-transparent text-info"
+                              title="Détails"
+                              onClick={() => setExpandedArticle(expandedArticle === a.id ? null : a.id)}
+                            >
+                              <i className="fi fi-rr-add" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                       {expandedArticle === a.id && (
@@ -385,7 +437,9 @@ export function ChiffrageProjetPage() {
         </div>
 
         <div className="col-lg-3">
-          <div className="card border-0 shadow-sm rounded-4 bg-white sticky-top" style={{ top: '100px' }}>
+          <div
+            className="card border-0 shadow-sm rounded-4 bg-white offer-summary-sticky"
+          >
             <div className="card-header bg-transparent border-bottom p-4">
               <h5 className="fw-extrabold mb-0 text-dark">Résumé Offre</h5>
             </div>

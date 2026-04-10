@@ -317,7 +317,8 @@ export default function ChiffrageProjet() {
 
                 {/* Sidebar Sticky Area */}
                 <div className="col-lg-3">
-                    <div className="card border-0 shadow-sm rounded-4 bg-white sticky-top animate__animated animate__fadeInRight" style={{ top: '100px' }}>
+                    <div
+                        className="card border-0 shadow-sm rounded-4 bg-white overflow-hidden">
                         <div className="card-header bg-transparent border-bottom p-4">
                             <h5 className="fw-extrabold mb-0 text-dark">Résumé Offre</h5>
                         </div>
