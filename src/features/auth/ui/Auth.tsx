@@ -2,8 +2,24 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../shared/providers/AuthContext';
 import { Building2, AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
-import { getApiUrl } from '../../../shared/config';
 import { getBackendURL } from '../../../shared/lib/api-bridge';
+
+const LOTS_DISPONIBLES = [
+  { id: '00000000-0000-0000-0000-000000000001', label: 'sols souples' },
+  { id: '00000000-0000-0000-0000-000000000002', label: 'sols durs' },
+  { id: '00000000-0000-0000-0000-000000000003', label: 'couverture' },
+  { id: '00000000-0000-0000-0000-000000000004', label: 'curage' },
+  { id: '00000000-0000-0000-0000-000000000005', label: 'cloisons et doublages' },
+  { id: '00000000-0000-0000-0000-000000000006', label: 'electricite' },
+  { id: '00000000-0000-0000-0000-000000000007', label: 'gros oeuvres' },
+  { id: '00000000-0000-0000-0000-000000000008', label: 'peinture' },
+  { id: '00000000-0000-0000-0000-000000000009', label: 'etancheite' },
+  { id: '00000000-0000-0000-0000-000000000010', label: 'facades' },
+  { id: '00000000-0000-0000-0000-000000000011', label: 'cvc plomberie' },
+  { id: '00000000-0000-0000-0000-000000000012', label: 'menuiseries interieures' },
+  { id: '00000000-0000-0000-0000-000000000013', label: 'demolition' },
+  { id: '00000000-0000-0000-0000-000000000014', label: 'serrurerie metallerie' },
+];
 
 export function Auth() {
   const { user, isLoading, signIn, signUp, isAuthenticated } = useAuth();
@@ -73,18 +89,6 @@ export function Auth() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
-  // Lots disponibles (mockés — remplacés par API quand disponible)
-  const LOTS_DISPONIBLES = [
-    { id: '00000000-0000-0000-0000-000000000001', label: 'Lot 1 — Gros Œuvre' },
-    { id: '00000000-0000-0000-0000-000000000002', label: 'Lot 2 — Charpente' },
-    { id: '00000000-0000-0000-0000-000000000003', label: 'Lot 3 — Couverture' },
-    { id: '00000000-0000-0000-0000-000000000004', label: 'Lot 4 — Menuiserie extérieure' },
-    { id: '00000000-0000-0000-0000-000000000005', label: 'Lot 5 — Plomberie' },
-    { id: '00000000-0000-0000-0000-000000000006', label: 'Lot 6 — Électricité' },
-    { id: '00000000-0000-0000-0000-000000000007', label: 'Lot 7 — Peinture' },
-    { id: '00000000-0000-0000-0000-000000000008', label: 'Lot 8 — Carrelage' },
-  ];
-
   // Inscription state
   const [nomEntreprise, setNomEntreprise] = useState('');
   const [email, setEmail] = useState('');
@@ -120,6 +124,12 @@ export function Auth() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (selectedLots.length === 0) {
+      setError('Veuillez selectionner au moins un lot.');
+      return;
+    }
+
     setIsGlobalLoading(true);
 
     try {
@@ -300,7 +310,7 @@ export function Auth() {
               </div>
               {/* ─── Lots BTP ─────────────────────────────────────────────── */}
               <div className="mb-3">
-                <label className="form-label small fw-bold text-muted">Lots de travaux <span className="text-muted fw-normal">(optionnel)</span></label>
+                <label className="form-label small fw-bold text-muted">Lots de travaux *</label>
                 <div className="border rounded bg-light p-2" style={{ maxHeight: '160px', overflowY: 'auto' }}>
                   {LOTS_DISPONIBLES.map(lot => (
                     <div key={lot.id} className="form-check">
@@ -322,6 +332,11 @@ export function Auth() {
                 {selectedLots.length > 0 && (
                   <div className="mt-1">
                     <small className="text-primary">{selectedLots.length} lot(s) sélectionné(s)</small>
+                  </div>
+                )}
+                {selectedLots.length === 0 && (
+                  <div className="mt-1">
+                    <small className="text-danger">Selection obligatoire: au moins un lot.</small>
                   </div>
                 )}
               </div>

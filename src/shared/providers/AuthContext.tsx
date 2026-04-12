@@ -200,7 +200,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       if (!response.ok) {
-        return { error: { message: "Erreur lors de l'inscription" } };
+        let errorMessage = "Erreur lors de l'inscription";
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData?.message || errorData?.error || errorData?.data?.message || errorMessage;
+        } catch {
+          if (response.status === 400) {
+            errorMessage = "Donnees invalides pour l'inscription";
+          }
+        }
+        return { error: { message: errorMessage } };
       }
 
       const result = await response.json();
