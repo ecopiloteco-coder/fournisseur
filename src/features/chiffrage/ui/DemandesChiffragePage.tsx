@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../shared/providers/AuthContext';
-import { fetchDemandesParEntreprise } from '../api/chiffrage.api';
+import { fetchDemandesParEntreprise, updateProjetStatus } from '../api/chiffrage.api';
+import { toast } from 'sonner';
 
 const COLUMNS = [
   { title: 'Nouveaux', status: 'Nouveau', statusClass: 'primary' },
@@ -45,7 +46,7 @@ export function DemandesChiffragePage() {
           owner: (d as any).contactName || (d as any).nomContact || (d as any).responsable || 'Noah Yannick',
           lot: 'Lots de consultation', // Simplified for list view
           date: d.deadline ? new Date(d.deadline).toLocaleDateString('fr-FR') : 'Non définie',
-          status: d.status === 'en attente' ? 'Nouveau' : d.status === 'en_cours' ? 'En cours' : d.status === 'termine' ? 'Terminé' : (d.status === 'archive' ? 'Archivé' : 'Soumis'),
+          status: d.status === 'en_attente' ? 'Nouveau' : d.status === 'en_cours' ? 'En cours' : d.status === 'termine' ? 'Terminé' : (d.status === 'archive' ? 'Archivé' : 'Soumis'),
           budget: d.prixTotal && d.prixTotal > 0 ? `${Number(d.prixTotal).toLocaleString('fr-FR')} €` : 'À chiffrer',
           articles: 0, // Placeholder
           isLate: d.deadline ? new Date(d.deadline) < new Date() && d.status !== 'termine' : false
@@ -88,6 +89,35 @@ export function DemandesChiffragePage() {
     return () => sortables.forEach(s => s.destroy());
   }, [viewMode, projects.length]);
   const handleOpenSignal = (p: any) => { setSelectedProject(p); setShowSignalModal(true); };
+
+  const handleAccept = async (p: any) => {
+    try {
+      setIsLoading(true);
+      await updateProjetStatus(p.id, { status: 'en_cours' });
+      toast.success('Demande acceptée avec succès !');
+      // Refresh list
+      const userId = user.keycloakId || String(user.entrepriseId);
+      const data = await fetchDemandesParEntreprise(userId);
+      const mapped = data.map(d => ({
+        id: d.id,
+        displayId: `PRJ-${d.projetId}`,
+        cardRef: `MT - ${String(d.projetId || d.id || 0).padStart(3, '0')}`,
+        name: d.nomProjet,
+        owner: (d as any).contactName || (d as any).nomContact || (d as any).responsable || 'Noah Yannick',
+        lot: 'Lots de consultation',
+        date: d.deadline ? new Date(d.deadline).toLocaleDateString('fr-FR') : 'Non définie',
+        status: d.status === 'en_attente' ? 'Nouveau' : d.status === 'en_cours' ? 'En cours' : d.status === 'termine' ? 'Terminé' : (d.status === 'archive' ? 'Archivé' : 'Soumis'),
+        budget: d.prixTotal && d.prixTotal > 0 ? `${Number(d.prixTotal).toLocaleString('fr-FR')} €` : 'À chiffrer',
+        articles: 0,
+        isLate: d.deadline ? new Date(d.deadline) < new Date() && d.status !== 'termine' : false
+      }));
+      setProjects(mapped);
+    } catch (err: any) {
+      toast.error('Erreur lors de l\'acceptation : ' + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <>
@@ -164,11 +194,19 @@ export function DemandesChiffragePage() {
                             </span>
                           </div>
                           <div className="d-flex gap-2">
-                            <button className="btn btn-sm btn-outline-warning flex-grow-1 fw-bold p-2"
-                              style={{ fontSize: '10px', borderRadius: '8px' }}
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOpenSignal(p); }}>
-                              Signaler
-                            </button>
+                             {p.status === 'Nouveau' ? (
+                               <button className="btn btn-sm btn-success flex-grow-1 fw-bold p-2 shadow-sm"
+                                  style={{ fontSize: '10px', borderRadius: '8px' }}
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleAccept(p); }}>
+                                  Accepter
+                               </button>
+                             ) : (
+                               <button className="btn btn-sm btn-outline-warning flex-grow-1 fw-bold p-2"
+                                  style={{ fontSize: '10px', borderRadius: '8px' }}
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOpenSignal(p); }}>
+                                  Signaler
+                               </button>
+                             )}
                             <Link to={`/chiffrage/${p.id}`} className="btn btn-sm btn-primary flex-grow-1 fw-bold p-2 shadow-sm"
                               style={{ fontSize: '10px', borderRadius: '8px' }}>
                               Chiffrer
@@ -226,7 +264,11 @@ export function DemandesChiffragePage() {
                     </td>
                     <td className="px-4 text-end">
                       <div className="d-flex justify-content-end gap-2">
-                        <button className="btn btn-sm btn-outline-warning rounded-pill px-3 fw-bold" onClick={() => handleOpenSignal(p)}>⚠️ Signaler</button>
+                        {p.status === 'Nouveau' ? (
+                          <button className="btn btn-sm btn-success rounded-pill px-3 fw-bold shadow-sm" onClick={() => handleAccept(p)}>✓ Accepter</button>
+                        ) : (
+                          <button className="btn btn-sm btn-outline-warning rounded-pill px-3 fw-bold" onClick={() => handleOpenSignal(p)}>⚠️ Signaler</button>
+                        )}
                         <Link to={`/chiffrage/${p.id}`} className="btn btn-sm btn-primary rounded-pill px-3 fw-bold shadow-sm">Chiffrer</Link>
                       </div>
                     </td>
