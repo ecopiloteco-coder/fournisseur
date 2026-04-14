@@ -60,16 +60,33 @@ function getTokenExpiry(token: string): number | null {
   }
 }
 
-function buildUserFromResponse(userObj: any): FournisseurUser {
+function getKeycloakIdFromToken(token: string | null): string | undefined {
+  if (!token) return undefined;
+  try {
+    const decoded = jwtDecode<{ sub?: string }>(token);
+    return decoded.sub || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function buildUserFromResponse(userObj: any, accessToken?: string): FournisseurUser {
+  const keycloakId = userObj.keycloakId ?? userObj.keycloak_id ?? getKeycloakIdFromToken(accessToken || null);
   return {
     ...userObj,
     id: userObj.id,
     email: userObj.email,
-    keycloakId: userObj.keycloakId ?? userObj.keycloak_id,
+    keycloakId,
     role: userObj.role === 'CHIFFREUR' ? 'CHIFFREUR' : 'ADMIN_FOURNISSEUR',
     nomEntreprise: userObj.nomEntreprise || userObj.entreprise?.raisonSociale,
     entrepriseId: userObj.entrepriseId || userObj.entreprise?.id,
   };
+}
+
+function mergeUserWithToken(userData: FournisseurUser | null, accessToken: string): FournisseurUser | null {
+  if (!userData) return userData;
+  const keycloakId = userData.keycloakId || getKeycloakIdFromToken(accessToken);
+  return keycloakId === userData.keycloakId ? userData : { ...userData, keycloakId };
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -81,11 +98,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const persistSession = useCallback((accessToken: string, refreshToken: string, userData: FournisseurUser) => {
+    const resolvedUser = mergeUserWithToken(userData, accessToken) || userData;
     setToken(accessToken);
-    setUser(userData);
+    setUser(resolvedUser);
     sessionStorage.setItem('fournisseur_token', accessToken);
     sessionStorage.setItem('fournisseur_refresh', refreshToken);
-    sessionStorage.setItem('fournisseur_user', JSON.stringify(userData));
+    sessionStorage.setItem('fournisseur_user', JSON.stringify(resolvedUser));
   }, []);
 
   const clearSession = useCallback(() => {
@@ -135,7 +153,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const savedUser = sessionStorage.getItem('fournisseur_user');
     const savedToken = sessionStorage.getItem('fournisseur_token');
     if (savedUser && savedToken) {
-      setUser(JSON.parse(savedUser));
+      setUser(mergeUserWithToken(JSON.parse(savedUser), savedToken));
       setToken(savedToken);
       scheduleRefresh(savedToken);
     }
@@ -166,7 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await response.json();
       if (result.success) {
         const { token: accessToken, refreshToken, user: userObj, requiresPasswordChange } = result.data;
-        const userData = buildUserFromResponse(userObj);
+        const userData = buildUserFromResponse(userObj, accessToken);
         persistSession(accessToken, refreshToken, userData);
         sessionStorage.setItem('requiresPasswordChange', requiresPasswordChange ? 'true' : 'false');
         scheduleRefresh(accessToken);

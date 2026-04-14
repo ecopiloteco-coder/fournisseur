@@ -1,77 +1,62 @@
-import React, { useState } from 'react';
-import { Send, X, ArrowLeft, MessageCircle, Clock } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { X, MessageCircle, Clock, ArrowRight, Send } from 'lucide-react';
+import { io, Socket } from 'socket.io-client';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../providers/AuthContext';
 import { useTheme } from '../providers/ThemeContext';
-
-interface Message {
-  id: string;
-  sender: 'user' | 'other';
-  content: string;
-  timestamp: string;
-}
+import { getNotificationBackendURL } from '../lib/api-bridge';
+import { jwtDecode } from 'jwt-decode';
 
 interface Conversation {
-  id: string;
-  senderName: string;
-  senderInitials: string;
+  roomId: string;
+  projetFournisseurId: number | null;
+  interneProjetId: number | null;
+  projectName: string;
+  status: string | null;
   lastMessage: string;
-  timestamp: string;
-  messages: Message[];
-  isRead: boolean;
+  lastSenderName?: string;
+  lastMessageAt?: string;
+  unreadCount: number;
 }
-
-const CONVERSATIONS: Conversation[] = [
-  {
-    id: '1',
-    senderName: 'Cambrone_Paris_15_RF_EDP',
-    senderInitials: 'CP',
-    lastMessage: 'Nouvelle demande',
-    timestamp: '15 mai 2026',
-    isRead: true,
-    messages: [
-      { id: '1', sender: 'other', content: 'Lorem ipsum', timestamp: '14:30' },
-      { id: '2', sender: 'other', content: 'Lorem ipsum dolor sit amet ?', timestamp: '14:35' },
-      { id: '3', sender: 'user', content: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.', timestamp: '14:40' },
-    ]
-  },
-  {
-    id: '2',
-    senderName: 'Nouvelle demande',
-    senderInitials: 'ND',
-    lastMessage: 'Une nouvelle demande de chiffrage est disponible',
-    timestamp: '39 minutes ago',
-    isRead: false,
-    messages: []
-  },
-  {
-    id: '3',
-    senderName: 'Nouvelle demande',
-    senderInitials: 'ND',
-    lastMessage: 'Une nouvelle demande de chiffrage est disponible',
-    timestamp: '48 minutes ago',
-    isRead: false,
-    messages: []
-  },
-  {
-    id: '4',
-    senderName: 'Nouvelle demande',
-    senderInitials: 'ND',
-    lastMessage: 'Une nouvelle demande de chiffrage est disponible',
-    timestamp: 'à l\'instant',
-    isRead: false,
-    messages: []
-  },
-];
 
 interface MessagingPanelProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+function getKeycloakIdFromToken(token: string | null): string | undefined {
+  if (!token) return undefined;
+  try {
+    const decoded = jwtDecode<{ sub?: string }>(token);
+    return decoded.sub || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function formatLastTime(iso?: string): string {
+  if (!iso) return '--';
+  const d = new Date(iso);
+  const diffMs = Date.now() - d.getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'a l\'instant';
+  if (mins < 60) return `il y a ${mins} min`;
+  if (mins < 24 * 60) return `il y a ${Math.floor(mins / 60)} h`;
+  return d.toLocaleDateString('fr-FR');
+}
+
 export const MessagingPanel: React.FC<MessagingPanelProps> = ({ isOpen, onClose }) => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const { theme } = useTheme();
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-  const [messageInput, setMessageInput] = useState('');
-  const [currentMessages, setCurrentMessages] = useState<Message[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatDraft, setChatDraft] = useState('');
+  const [chatMessages, setChatMessages] = useState<Array<{ id: string; senderType?: string; senderName?: string; message: string; createdAt?: string }>>([]);
+  const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
   // Color scheme based on theme
   const colors = {
@@ -97,29 +82,178 @@ export const MessagingPanel: React.FC<MessagingPanelProps> = ({ isOpen, onClose 
 
   const currentColors = colors[theme === 'dark' ? 'dark' : 'light'];
 
-  const handleSelectConversation = (conv: Conversation) => {
-    setSelectedConversation(conv);
-    setCurrentMessages(conv.messages);
+  const chatUserId = useMemo(() => {
+    const token = sessionStorage.getItem('fournisseur_token');
+    return user?.keycloakId || getKeycloakIdFromToken(token) || '';
+  }, [user]);
+
+  const token = sessionStorage.getItem('fournisseur_token');
+
+  const markConversationAsRead = async (roomId: string) => {
+    if (!chatUserId || !roomId) return;
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+    try {
+      await fetch(`${getNotificationBackendURL()}/api/chat/${roomId}/read?userId=${encodeURIComponent(chatUserId)}`, {
+        method: 'PATCH',
+        headers,
+      });
+    } catch {
+    }
   };
 
-  const handleSendMessage = () => {
-    if (!messageInput.trim() || !selectedConversation) return;
-    const newMessage: Message = {
-      id: String(currentMessages.length + 1),
-      sender: 'user',
-      content: messageInput,
-      timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  const openConversation = (conv: Conversation) => {
+    setActiveConversation(conv);
+    setConversations((prev) => prev.map((c) => (c.roomId === conv.roomId ? { ...c, unreadCount: 0 } : c)));
+    void markConversationAsRead(conv.roomId);
+  };
+
+  useEffect(() => {
+    if (!activeConversation || !chatUserId) {
+      setChatMessages([]);
+      return;
+    }
+
+    const roomId = activeConversation.roomId;
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+    let mounted = true;
+    let socket: Socket | null = null;
+
+    const loadHistory = async () => {
+      try {
+        setChatLoading(true);
+        const res = await fetch(`${getNotificationBackendURL()}/api/chat/${roomId}/messages`, { headers });
+        const json = await res.json();
+        if (!mounted) return;
+        if (json?.success && Array.isArray(json.data)) {
+          setChatMessages(
+            json.data.map((m: any) => ({
+              id: m._id || `${Date.now()}-${Math.random()}`,
+              senderType: m.senderType,
+              senderName: m.senderName,
+              message: m.message || '',
+              createdAt: m.createdAt,
+            })),
+          );
+        } else {
+          setChatMessages([]);
+        }
+      } catch {
+        if (mounted) setChatMessages([]);
+      } finally {
+        if (mounted) setChatLoading(false);
+      }
     };
-    setCurrentMessages([...currentMessages, newMessage]);
-    setMessageInput('');
-  };
 
-  const handleBackToList = () => {
-    setSelectedConversation(null);
-    setCurrentMessages([]);
-  };
+    void loadHistory();
+
+    socket = io(getNotificationBackendURL(), {
+      transports: ['websocket'],
+      auth: { token },
+    });
+
+    socket.on('connect', () => {
+      socket?.emit('join-room', roomId);
+    });
+
+    socket.on('chat-message', (m: any) => {
+      if (m.roomId !== roomId) return;
+      const nextId = m._id || `${Date.now()}-${Math.random()}`;
+      setChatMessages((prev) => {
+        if (prev.some((x) => x.id === nextId)) return prev;
+        return [
+          ...prev,
+          {
+            id: nextId,
+            senderType: m.senderType,
+            senderName: m.senderName,
+            message: m.message || '',
+            createdAt: m.createdAt,
+          },
+        ];
+      });
+    });
+
+    return () => {
+      mounted = false;
+      socket?.disconnect();
+    };
+  }, [activeConversation, chatUserId, token]);
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages.length]);
+
+  useEffect(() => {
+    if (!isOpen || !chatUserId) return;
+
+    const token = sessionStorage.getItem('fournisseur_token');
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+
+    const load = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(`${getNotificationBackendURL()}/api/chat/conversations?userId=${encodeURIComponent(chatUserId)}`, { headers });
+        const json = await res.json();
+        if (json?.success && Array.isArray(json.data)) {
+          setConversations(json.data);
+        } else {
+          setConversations([]);
+        }
+      } catch {
+        setConversations([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void load();
+  }, [isOpen, chatUserId]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setActiveConversation(null);
+      setChatDraft('');
+      setChatMessages([]);
+    }
+  }, [isOpen]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return conversations;
+    return conversations.filter((c) =>
+      c.projectName.toLowerCase().includes(q)
+      || c.lastMessage.toLowerCase().includes(q)
+      || (c.lastSenderName || '').toLowerCase().includes(q),
+    );
+  }, [conversations, search]);
 
   if (!isOpen) return null;
+
+  const sendMessage = async () => {
+    if (!activeConversation || !chatUserId) return;
+    const trimmed = chatDraft.trim();
+    if (!trimmed) return;
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    try {
+      await fetch(`${getNotificationBackendURL()}/api/chat/${activeConversation.roomId}/messages`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          senderId: chatUserId,
+          senderName: user?.nomContact || [user?.prenom, user?.nom].filter(Boolean).join(' ').trim() || user?.email || 'Fournisseur',
+          senderType: 'FOURNISSEUR',
+          message: trimmed,
+        }),
+      });
+      setChatDraft('');
+    } catch {
+    }
+  };
 
   return (
     <>
@@ -138,139 +272,17 @@ export const MessagingPanel: React.FC<MessagingPanelProps> = ({ isOpen, onClose 
         }}
         className="fixed right-0 top-0 bottom-0 w-[450px] z-[1000] shadow-lg flex flex-col overflow-hidden"
       >
-        {!selectedConversation ? (
-          <>
-            {/* Header*/}
-            <div 
-              style={{
-                borderBottomColor: currentColors.border,
-                backgroundColor: currentColors.card
-              }}
-              className="px-6 py-5 border-b">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <MessageCircle style={{ color: currentColors.primary }} className="w-6 h-6" />
-                  <h5 style={{ color: currentColors.foreground }} className="m-0 font-bold text-lg">Messages</h5>
-                </div>
-                <button 
-                  onClick={onClose}
-                  style={{
-                    backgroundColor: 'transparent',
-                    color: currentColors.muted
-                  }}
-                  className="hover:bg-opacity-10 rounded-full p-2 transition-colors hover:opacity-80"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Tabs */}
-            <div 
-              style={{
-                borderBottomColor: currentColors.border
-              }}
-              className="flex border-b px-4 bg-opacity-50">
-              <button 
-                style={{ 
-                  borderBottomColor: currentColors.primary, 
-                  color: currentColors.primary,
-                  fontWeight: '600'
-                }} 
-                className="flex-1 bg-transparent border-0 border-b-2 py-4 text-sm font-semibold cursor-pointer transition-colors"
-              >
-                Reçus
-              </button>
-              <button 
-                style={{ color: currentColors.muted }} 
-                className="flex-1 bg-transparent border-0 border-b-2 border-transparent py-4 text-sm cursor-pointer transition-colors hover:text-opacity-80"
-              >
-                Non lus
-              </button>
-            </div>
-
-            {/* Search */}
-            <div className="px-4 py-3">
-              <input
-                type="text"
-                placeholder="Rechercher des conversations..."
-                style={{
-                  borderColor: currentColors.border,
-                  backgroundColor: currentColors.input,
-                  color: currentColors.foreground
-                }}
-                className="w-full px-4 py-2.5 rounded-2xl border text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
-              />
-            </div>
-
-            {/* Conversations List */}
-            <div className="flex-1 overflow-y-auto" style={{ backgroundColor: currentColors.card }}>
-              {CONVERSATIONS.map((conv) => (
-                <div
-                  key={conv.id}
-                  onClick={() => handleSelectConversation(conv)}
-                  style={{
-                    borderBottomColor: currentColors.border,
-                    color: currentColors.foreground,
-                    backgroundColor: currentColors.card
-                  }}
-                  className="px-4 py-3 border-b cursor-pointer hover:bg-opacity-80 transition-all duration-150 hover:shadow-sm"
-                >
-                  <div className="flex gap-3 items-start">
-                    <div 
-                      style={{ backgroundColor: currentColors.primary }} 
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-sm"
-                    >
-                      {conv.senderInitials}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-baseline gap-2 mb-1">
-                        <h6 style={{ color: currentColors.foreground }} className="m-0 font-semibold text-sm overflow-hidden text-ellipsis whitespace-nowrap">
-                          {conv.senderName}
-                        </h6>
-                        <small style={{ color: currentColors.muted }} className="flex-shrink-0 text-xs opacity-75">
-                          {conv.timestamp}
-                        </small>
-                      </div>
-                      <p style={{ color: currentColors.muted }} className="m-0 text-xs overflow-hidden text-ellipsis whitespace-nowrap leading-snug">
-                        {conv.lastMessage}
-                      </p>
-                    </div>
-                    {!conv.isRead && (
-                      <div style={{ backgroundColor: currentColors.primary }} className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1.5 shadow-sm"></div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Conversation Header */}
-            <div 
-              style={{
-                borderBottomColor: currentColors.border,
-                backgroundColor: currentColors.card
-              }}
-              className="px-6 py-4 border-b flex items-center gap-4">
-              <button
-                onClick={handleBackToList}
-                style={{
-                  backgroundColor: 'transparent',
-                  color: currentColors.primary
-                }}
-                className="rounded-lg p-2 hover:bg-opacity-10 transition-all"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div className="flex-1 min-w-0">
-                <h6 style={{ color: currentColors.foreground }} className="m-0 font-semibold text-base">
-                  {selectedConversation.senderName}
-                </h6>
-                <small style={{ color: currentColors.muted }} className="flex items-center gap-1 text-xs mt-1">
-                  <Clock className="w-3 h-3" />
-                  15 mai 2026
-                </small>
+        <>
+          <div 
+            style={{
+              borderBottomColor: currentColors.border,
+              backgroundColor: currentColors.card
+            }}
+            className="px-6 py-5 border-b">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <MessageCircle style={{ color: currentColors.primary }} className="w-6 h-6" />
+                <h5 style={{ color: currentColors.foreground }} className="m-0 font-bold text-lg">Discussions projet</h5>
               </div>
               <button 
                 onClick={onClose}
@@ -278,72 +290,180 @@ export const MessagingPanel: React.FC<MessagingPanelProps> = ({ isOpen, onClose 
                   backgroundColor: 'transparent',
                   color: currentColors.muted
                 }}
-                className="rounded-full p-2 hover:opacity-80 transition-all"
+                className="hover:bg-opacity-10 rounded-full p-2 transition-colors hover:opacity-80"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
+          </div>
 
-            {/* Messages */}
-            <div style={{ backgroundColor: currentColors.card }} className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-4">
-              {currentMessages.length > 0 ? (
-                currentMessages.map((msg, idx) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
-                  >
-                    <div style={{
-                      backgroundColor: msg.sender === 'user' ? currentColors.primary : currentColors.muted,
-                      color: msg.sender === 'user' ? currentColors.primaryForeground : currentColors.foreground
-                    }} className={`max-w-xs rounded-2xl px-4 py-2.5 shadow-sm ${msg.sender === 'user' ? 'rounded-br-none' : 'rounded-bl-none'}`}>
-                      <p className="m-0 text-sm leading-relaxed">{msg.content}</p>
-                      <small style={{ opacity: 0.7 }} className="text-xs mt-1 block text-right">{msg.timestamp}</small>
+          <div className="px-4 py-3">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher des conversations..."
+              style={{
+                borderColor: currentColors.border,
+                backgroundColor: currentColors.input,
+                color: currentColors.foreground
+              }}
+              className="w-full px-4 py-2.5 rounded-2xl border text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+            />
+          </div>
+
+          <div className="flex-1 overflow-y-auto" style={{ backgroundColor: currentColors.card }}>
+            {loading && (
+              <div className="px-4 py-6 text-center text-sm" style={{ color: currentColors.muted }}>
+                Chargement des discussions...
+              </div>
+            )}
+
+            {!loading && filtered.length === 0 && (
+              <div className="px-4 py-6 text-center text-sm" style={{ color: currentColors.muted }}>
+                Aucune discussion ouverte.
+              </div>
+            )}
+
+            {!loading && filtered.map((conv) => (
+              <div
+                key={conv.roomId}
+                style={{
+                  borderBottomColor: currentColors.border,
+                  color: currentColors.foreground,
+                  backgroundColor: currentColors.card
+                }}
+                className="px-4 py-3 border-b cursor-pointer hover:bg-black/5 transition-colors"
+                onClick={() => openConversation(conv)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h6 style={{ color: currentColors.foreground }} className="m-0 font-semibold text-sm truncate">
+                        {conv.projectName}
+                      </h6>
+                      {conv.unreadCount > 0 && (
+                        <span className="badge bg-danger text-white rounded-pill">{conv.unreadCount}</span>
+                      )}
+                    </div>
+                    <p className="m-0 text-xs truncate" style={{ color: currentColors.muted }}>
+                      {conv.lastSenderName ? `${conv.lastSenderName}: ` : ''}{conv.lastMessage || 'Discussion ouverte'}
+                    </p>
+                    <div className="mt-1 flex items-center gap-2 text-[11px]" style={{ color: currentColors.muted }}>
+                      <Clock className="w-3 h-3" />
+                      <span>{formatLastTime(conv.lastMessageAt)}</span>
+                      <span className="text-uppercase">{conv.status || 'inconnu'}</span>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div style={{ color: currentColors.muted }} className="text-center flex flex-col items-center justify-center h-full gap-3">
-                  <MessageCircle style={{ color: currentColors.muted }} className="w-12 h-12 opacity-20" />
-                  <small className="text-sm">Aucun message</small>
+                  <button
+                    className="btn btn-sm btn-primary rounded-pill d-inline-flex align-items-center gap-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (conv.projetFournisseurId) {
+                        navigate(`/chiffrage/${conv.projetFournisseurId}`);
+                        onClose();
+                      }
+                    }}
+                    disabled={!conv.projetFournisseurId}
+                  >
+                    Ouvrir <ArrowRight className="w-3 h-3" />
+                  </button>
                 </div>
-              )}
+              </div>
+            ))}
+          </div>
+        </>
+      </div>
+
+      {activeConversation && (
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/45 p-4">
+          <div
+            style={{
+              backgroundColor: currentColors.card,
+              borderColor: currentColors.border,
+              color: currentColors.foreground,
+            }}
+            className="w-full max-w-2xl h-[72vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden"
+          >
+            <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderBottomColor: currentColors.border }}>
+              <div className="min-w-0">
+                <h6 className="m-0 font-semibold text-sm truncate">{activeConversation.projectName}</h6>
+                <p className="m-0 text-xs" style={{ color: currentColors.muted }}>{activeConversation.status || 'inconnu'}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  className="btn btn-sm btn-primary rounded-pill d-inline-flex align-items-center gap-1"
+                  onClick={() => {
+                    if (activeConversation.projetFournisseurId) {
+                      navigate(`/chiffrage/${activeConversation.projetFournisseurId}`);
+                      onClose();
+                    }
+                  }}
+                  disabled={!activeConversation.projetFournisseurId}
+                >
+                  Ouvrir <ArrowRight className="w-3 h-3" />
+                </button>
+                <button
+                  className="rounded-full p-2 hover:bg-black/10"
+                  onClick={() => setActiveConversation(null)}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            {/* Input */}
-            <div 
-              style={{
-                borderTopColor: currentColors.border,
-                backgroundColor: currentColors.card
-              }}
-              className="border-t px-4 py-4 flex gap-3 items-end">
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3" style={{ backgroundColor: currentColors.input }}>
+              {chatLoading && <div className="text-sm" style={{ color: currentColors.muted }}>Chargement du chat...</div>}
+              {!chatLoading && chatMessages.length === 0 && (
+                <div className="text-sm" style={{ color: currentColors.muted }}>Aucun message.</div>
+              )}
+              {!chatLoading && chatMessages.map((m) => {
+                const isMine = String(m.senderType || '').toUpperCase() === 'FOURNISSEUR';
+                return (
+                  <div key={m.id} className={`d-flex ${isMine ? 'justify-content-end' : 'justify-content-start'}`}>
+                    <div
+                      className="px-3 py-2 rounded-3"
+                      style={{
+                        maxWidth: '78%',
+                        backgroundColor: isMine ? currentColors.primary : currentColors.card,
+                        color: isMine ? currentColors.primaryForeground : currentColors.foreground,
+                        border: isMine ? 'none' : `1px solid ${currentColors.border}`,
+                      }}
+                    >
+                      <p className="m-0 text-sm" style={{ whiteSpace: 'pre-wrap' }}>{m.message}</p>
+                      <div className="mt-1 text-[11px] opacity-70">
+                        {formatLastTime(m.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={chatBottomRef} />
+            </div>
+
+            <div className="px-3 py-3 border-top d-flex gap-2" style={{ borderTopColor: currentColors.border }}>
               <input
                 type="text"
-                placeholder="Écrire votre message..."
-                value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                value={chatDraft}
+                onChange={(e) => setChatDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void sendMessage();
+                }}
+                placeholder="Ecrire un message..."
                 style={{
                   borderColor: currentColors.border,
                   backgroundColor: currentColors.input,
-                  color: currentColors.foreground
+                  color: currentColors.foreground,
                 }}
-                className="flex-1 px-4 py-2.5 rounded-2xl border text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all resize-none max-h-24"
+                className="form-control rounded-pill"
               />
-              <button
-                onClick={handleSendMessage}
-                disabled={!messageInput.trim()}
-                style={{ 
-                  backgroundColor: messageInput.trim() ? currentColors.primary : currentColors.muted,
-                  opacity: messageInput.trim() ? 1 : 0.6
-                }}
-                className="border-0 rounded-full w-10 h-10 flex items-center justify-center cursor-pointer hover:shadow-md transition-all active:scale-95"
-              >
-                <Send className="w-4 h-4 text-white" />
+              <button className="btn btn-primary rounded-pill" onClick={() => void sendMessage()}>
+                <Send className="w-4 h-4" />
               </button>
             </div>
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

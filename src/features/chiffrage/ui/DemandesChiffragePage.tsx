@@ -7,8 +7,8 @@ import { toast } from 'sonner';
 const COLUMNS = [
   { title: 'Nouveaux', status: 'Nouveau', statusClass: 'primary' },
   { title: 'En cours', status: 'En cours', statusClass: 'warning' },
-  { title: 'Envoyé', status: 'Soumis', statusClass: 'info' },
   { title: 'Terminé', status: 'Terminé', statusClass: 'success' },
+  { title: 'Expiré', status: 'Soumis', statusClass: 'danger' },
 ];
 
 export function DemandesChiffragePage() {
@@ -194,23 +194,17 @@ export function DemandesChiffragePage() {
                             </span>
                           </div>
                           <div className="d-flex gap-2">
-                             {p.status === 'Nouveau' ? (
-                               <button className="btn btn-sm btn-success flex-grow-1 fw-bold p-2 shadow-sm"
-                                  style={{ fontSize: '10px', borderRadius: '8px' }}
-                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleAccept(p); }}>
-                                  Accepter
-                               </button>
-                             ) : (
-                               <button className="btn btn-sm btn-outline-warning flex-grow-1 fw-bold p-2"
-                                  style={{ fontSize: '10px', borderRadius: '8px' }}
-                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOpenSignal(p); }}>
-                                  Signaler
-                               </button>
-                             )}
-                            <Link to={`/chiffrage/${p.id}`} className="btn btn-sm btn-primary flex-grow-1 fw-bold p-2 shadow-sm"
-                              style={{ fontSize: '10px', borderRadius: '8px' }}>
-                              Chiffrer
-                            </Link>
+                            {p.status === 'En cours' ? (
+                              <Link to={`/chiffrage/${p.id}`} className="btn btn-sm btn-primary flex-grow-1 fw-bold p-2 shadow-sm"
+                                style={{ fontSize: '10px', borderRadius: '8px' }}>
+                                Chiffrer
+                              </Link>
+                            ) : (
+                              <Link to={`/chiffrage/${p.id}`} className="btn btn-sm btn-success flex-grow-1 fw-bold p-2 shadow-sm"
+                                style={{ fontSize: '10px', borderRadius: '8px' }}>
+                                Consulter
+                              </Link>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -264,12 +258,11 @@ export function DemandesChiffragePage() {
                     </td>
                     <td className="px-4 text-end">
                       <div className="d-flex justify-content-end gap-2">
-                        {p.status === 'Nouveau' ? (
-                          <button className="btn btn-sm btn-success rounded-pill px-3 fw-bold shadow-sm" onClick={() => handleAccept(p)}>✓ Accepter</button>
+                        {p.status === 'En cours' ? (
+                          <Link to={`/chiffrage/${p.id}`} className="btn btn-sm btn-primary rounded-pill px-3 fw-bold shadow-sm">Chiffrer</Link>
                         ) : (
-                          <button className="btn btn-sm btn-outline-warning rounded-pill px-3 fw-bold" onClick={() => handleOpenSignal(p)}>⚠️ Signaler</button>
+                          <Link to={`/chiffrage/${p.id}`} className="btn btn-sm btn-success rounded-pill px-3 fw-bold shadow-sm">Consulter</Link>
                         )}
-                        <Link to={`/chiffrage/${p.id}`} className="btn btn-sm btn-primary rounded-pill px-3 fw-bold shadow-sm">Chiffrer</Link>
                       </div>
                     </td>
                   </tr>

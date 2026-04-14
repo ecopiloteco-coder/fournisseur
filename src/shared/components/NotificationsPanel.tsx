@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Bell } from 'lucide-react';
 import { useTheme } from '../providers/ThemeContext';
 import { useNotifications } from '../providers/NotificationProvider';
@@ -9,9 +10,17 @@ interface NotificationsPanelProps {
 }
 
 export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, onClose }) => {
+  const navigate = useNavigate();
   const { theme } = useTheme();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [selectedTab, setSelectedTab] = useState<'tous' | 'nonlus'>('tous');
+
+  const navigateFromNotification = (notif: any) => {
+    const fallback = notif.projetFournisseurId ? `/chiffrage/${notif.projetFournisseurId}` : '/chiffrage/demandes';
+    const target = notif.actionUrl || fallback;
+    navigate(target);
+    onClose();
+  };
 
   // Color scheme based on theme
   const colors = {
@@ -156,7 +165,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
                             borderBottomColor: currentColors.border,
                             backgroundColor: !notif.read ? currentColors.sectionBg : 'transparent'
                           }}
-                          className="px-6 py-4 border-b hover:shadow-sm transition-all relative group"
+                          className="px-6 py-4 border-b hover:shadow-sm transition-all relative cursor-pointer"
                         >
                           <div className="flex gap-4 items-start">
                             {/* Avatar placeholder */}
@@ -173,7 +182,10 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
                               {/* Content */}
                               <div 
                                 className="cursor-pointer"
-                                onClick={() => markAsRead(notif.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigateFromNotification(notif);
+                                }}
                               >
                                 <div className="flex justify-between items-start gap-2 mb-1">
                                   <h6 style={{ color: currentColors.foreground }} className="m-0 font-semibold text-sm leading-tight">
@@ -193,8 +205,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    markAsRead(notif.id);
-                                    onClose();
+                                    navigateFromNotification(notif);
                                   }}
                                   style={{
                                     backgroundColor: currentColors.primary,
@@ -258,7 +269,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
                             borderBottomColor: currentColors.border,
                             backgroundColor: !notif.read ? currentColors.sectionBg : 'transparent'
                           }}
-                          className="px-6 py-4 border-b hover:shadow-sm transition-all relative"
+                          className="px-6 py-4 border-b hover:shadow-sm transition-all relative cursor-pointer"
                         >
                           <div className="flex gap-4 items-start">
                             {/* Avatar placeholder */}
@@ -275,7 +286,10 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
                               {/* Content */}
                               <div 
                                 className="cursor-pointer"
-                                onClick={() => markAsRead(notif.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigateFromNotification(notif);
+                                }}
                               >
                                 <div className="flex justify-between items-start gap-2 mb-1">
                                   <h6 style={{ color: currentColors.foreground }} className="m-0 font-semibold text-sm leading-tight">
@@ -295,8 +309,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    markAsRead(notif.id);
-                                    onClose();
+                                    navigateFromNotification(notif);
                                   }}
                                   style={{
                                     backgroundColor: currentColors.primary,

@@ -1,18 +1,62 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useNotifications } from '../../shared/providers/NotificationProvider'
 import { useAuth } from '../../shared/providers/AuthContext'
 import { MessagingPanel } from '../../shared/components/MessagingPanel'
 import { NotificationsPanel } from '../../shared/components/NotificationsPanel'
+import { getNotificationBackendURL } from '../../shared/lib/api-bridge'
+import { jwtDecode } from 'jwt-decode'
+
+function getKeycloakIdFromToken(token) {
+    if (!token) return undefined
+    try {
+        const decoded = jwtDecode(token)
+        return decoded?.sub
+    } catch {
+        return undefined
+    }
+}
 
 export default function Header({ onToggleSidebar }) {
     const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
     const { user, logout } = useAuth()
     const [showMessaging, setShowMessaging] = useState(false)
     const [showNotifications, setShowNotifications] = useState(false)
-    
-    // Count unread messages (hardcoded for now, can be connected to actual messaging system)
-    const unreadMessagesCount = 3
+    const [unreadMessagesCount, setUnreadMessagesCount] = useState(0)
+
+    const chatUserId = useMemo(() => {
+        const token = sessionStorage.getItem('fournisseur_token')
+        return user?.keycloakId || getKeycloakIdFromToken(token) || ''
+    }, [user])
+
+    useEffect(() => {
+        if (!chatUserId) {
+            setUnreadMessagesCount(0)
+            return
+        }
+
+        const token = sessionStorage.getItem('fournisseur_token')
+        const headers = token ? { Authorization: `Bearer ${token}` } : {}
+
+        const loadUnread = async () => {
+            try {
+                const res = await fetch(`${getNotificationBackendURL()}/api/chat/conversations?userId=${encodeURIComponent(chatUserId)}`, { headers })
+                const json = await res.json()
+                if (json?.success && Array.isArray(json.data)) {
+                    const total = json.data.reduce((sum, item) => sum + Number(item?.unreadCount || 0), 0)
+                    setUnreadMessagesCount(total)
+                } else {
+                    setUnreadMessagesCount(0)
+                }
+            } catch {
+                setUnreadMessagesCount(0)
+            }
+        }
+
+        void loadUnread()
+        const timer = setInterval(loadUnread, 20000)
+        return () => clearInterval(timer)
+    }, [chatUserId, showMessaging])
 
     return (
         <>

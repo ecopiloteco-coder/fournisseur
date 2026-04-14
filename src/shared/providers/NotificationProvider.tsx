@@ -1,24 +1,27 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { io, Socket } from 'socket.io-client';
-import { getBackendURL, getNotificationBackendURL } from '../lib/api-bridge';
+import { jwtDecode } from 'jwt-decode';
+import { getNotificationBackendURL } from '../lib/api-bridge';
 import { useAuth } from './AuthContext';
 
 interface Notification {
-  id: number;
-  signalId?: number | null;
+  id: string;
   title: string;
   desc: string;
   time: string;
   read: boolean;
   type: 'info' | 'warning' | 'success' | 'error';
+  actionUrl?: string | null;
+  projetFournisseurId?: string | null;
+  createdAt: string;
 }
 
 interface NotificationContextType {
   notifications: Notification[];
   unreadCount: number;
-  markAsRead: (id: number) => void;
+  markAsRead: (id: string) => void;
   markAllAsRead: () => void;
-  addNotification: (title: string, desc: string, type?: Notification['type'], signalId?: number | null) => void;
+  addNotification: (notification: Notification) => void;
   sendSignal: (to: string, type: string, message: string, extra?: any) => void;
 }
 
@@ -36,35 +39,132 @@ interface NotificationProviderProps {
   children: ReactNode;
 }
 
+function getKeycloakIdFromToken(token: string | null): string | undefined {
+  if (!token) return undefined;
+  try {
+    const decoded = jwtDecode<{ sub?: string }>(token);
+    return decoded.sub || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export const NotificationProvider = ({ children }: NotificationProviderProps) => {
   const { user } = useAuth();
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [notifications, setNotifications] = useState<Notification[]>([
-    { id: 1, title: 'Nouvelle Demande', desc: 'Une nouvelle demande de chiffrage est disponible.', time: 'il y a 2h', read: false, type: 'info' },
-    { id: 2, title: 'Échéance Demain', desc: 'Rendu du chiffrage "Résidence Lilas" demain.', time: 'il y a 5h', read: false, type: 'warning' }
-  ])
+  const [notifications, setNotifications] = useState<Notification[]>([])
 
   const unreadCount = notifications.filter(n => !n.read).length
 
-  const markAsRead = (id: number) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+  const formatTime = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return 'A l\'instant';
+    if (minutes < 60) return `Il y a ${minutes} min`;
+    if (hours < 24) return `Il y a ${hours}h`;
+    if (days < 7) return `Il y a ${days}j`;
+    return date.toLocaleDateString('fr-FR');
+  };
+
+  const normalizeType = (value?: string): Notification['type'] => {
+    const type = (value || 'info').toLowerCase();
+    if (type.includes('warn')) return 'warning';
+    if (type.includes('error')) return 'error';
+    if (type.includes('success') || type.includes('accepte') || type.includes('soumis')) return 'success';
+    return 'info';
+  };
+
+  const playNotificationSound = () => {
+    try {
+      const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.value = 0.03;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.12);
+    } catch {
+    }
+  };
+
+  const showBrowserNotification = (n: Notification) => {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    if (!document.hidden) return;
+
+    try {
+      const browserNotif = new Notification(n.title, {
+        body: n.desc,
+        tag: n.id,
+      });
+      browserNotif.onclick = () => {
+        window.focus();
+      };
+    } catch {
+    }
+  };
+
+  const mapRawNotification = (raw: any): Notification => {
+    const createdAt = raw.createdAt || new Date().toISOString();
+    return {
+      id: raw._id || raw.id || String(Date.now()),
+      title: raw.subject || raw.title || 'Nouvelle notification',
+      desc: raw.content || raw.message || raw.contenu || '',
+      time: formatTime(createdAt),
+      read: Boolean(raw.isRead ?? raw.read),
+      type: normalizeType(raw.type),
+      actionUrl: raw?.metadata?.actionUrl || raw.actionUrl || null,
+      projetFournisseurId: raw?.metadata?.projetFournisseurId || raw.projetFournisseurId || null,
+      createdAt,
+    };
+  };
+
+  const markAsRead = (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+
+    const token = sessionStorage.getItem('fournisseur_token');
+    const userId = user?.keycloakId || getKeycloakIdFromToken(token) || String(user?.entrepriseId || '');
+    void fetch(`${getNotificationBackendURL()}/api/notifications/${id}/read`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ userId }),
+    });
   }
 
   const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+
+    const token = sessionStorage.getItem('fournisseur_token');
+    const userId = user?.keycloakId || getKeycloakIdFromToken(token) || String(user?.entrepriseId || '');
+    void fetch(`${getNotificationBackendURL()}/api/notifications/read-all`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ userId }),
+    });
   }
 
-  const addNotification = (title: string, desc: string, type: Notification['type'] = 'info', signalId: number | null = null) => {
-    const NewNotif: Notification = {
-      id: Date.now() + Math.random(),
-      signalId,
-      title,
-      desc,
-      time: 'Maintenant',
-      read: false,
-      type
-    }
-    setNotifications(prev => [NewNotif, ...prev])
+  const addNotification = (notification: Notification) => {
+    setNotifications(prev => {
+      const withoutDuplicate = prev.filter(n => n.id !== notification.id);
+      return [notification, ...withoutDuplicate];
+    });
+    playNotificationSound();
+    showBrowserNotification(notification);
   }
 
   const sendSignal = (to: string, type: string, message: string, extra: any = {}) => {
@@ -80,7 +180,17 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
     const existing = JSON.parse(localStorage.getItem('ecopilot_signals') || '[]')
     localStorage.setItem('ecopilot_signals', JSON.stringify([...existing, newSignal]))
 
-    addNotification('Signal envoyé', 'Votre alerte a été transmise à l\'entreprise.', 'success')
+    addNotification({
+      id: String(Date.now()),
+      title: 'Signal envoye',
+      desc: 'Votre alerte a ete transmise a l\'entreprise.',
+      time: 'A l\'instant',
+      read: false,
+      type: 'success',
+      createdAt: new Date().toISOString(),
+      actionUrl: null,
+      projetFournisseurId: null,
+    })
   }
 
   useEffect(() => {
@@ -89,10 +199,20 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
         try {
           const allSignals = JSON.parse(e.newValue)
           const relances = allSignals.filter((s: any) => 
-            s.to === 'supplier' && !notifications.some(n => n.signalId === s.id)
+            s.to === 'supplier' && !notifications.some(n => n.id === String(s.id))
           )
           relances.forEach((s: any) => {
-            addNotification('Relance Entreprise', s.message, 'warning', s.id)
+            addNotification({
+              id: String(s.id),
+              title: 'Relance Entreprise',
+              desc: s.message,
+              time: 'A l\'instant',
+              read: false,
+              type: 'warning',
+              createdAt: new Date().toISOString(),
+              actionUrl: null,
+              projetFournisseurId: null,
+            })
           })
         } catch (err) {
           console.error("Error parsing signals", err)
@@ -103,12 +223,34 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
     return () => window.removeEventListener('storage', handleStorageChange)
   }, [notifications])
 
-  // Real-time Socket.io Connection for backend notifications
+  useEffect(() => {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default' && user) {
+      void Notification.requestPermission();
+    }
+  }, [user]);
+
+  // Initial load + realtime socket notifications
   useEffect(() => {
     if (!user) return;
     
     const token = sessionStorage.getItem('fournisseur_token');
-    const userId = user.keycloakId || String(user.entrepriseId);
+    const userId = user.keycloakId || getKeycloakIdFromToken(token) || String(user.entrepriseId);
+
+    const loadNotifications = async () => {
+      try {
+        const response = await fetch(`${getNotificationBackendURL()}/api/notifications?userId=${encodeURIComponent(userId)}&limit=50`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const json = await response.json();
+        if (json?.success && Array.isArray(json.data)) {
+          setNotifications(json.data.map(mapRawNotification));
+        }
+      } catch (err) {
+        console.error('Unable to load notifications', err);
+      }
+    };
+    void loadNotifications();
     
     const newSocket = io(getNotificationBackendURL(), {
       transports: ['websocket'],
@@ -120,15 +262,8 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
     });
 
     newSocket.on('notification', (notif: any) => {
-      addNotification(
-        notif.title || 'Nouvelle Notification', 
-        notif.message || notif.contenu || '', 
-        notif.type || 'info', 
-        notif.projetId || notif.referenceId || null
-      );
+      addNotification(mapRawNotification(notif));
     });
-
-    setSocket(newSocket);
 
     return () => { newSocket.disconnect(); };
   }, [user]);

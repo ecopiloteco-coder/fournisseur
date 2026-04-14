@@ -32,6 +32,7 @@ export interface ArticleProjetFournisseurResponse {
   tva: number;
   prixTotal: number;
   rabais: number;
+  projetArticleId?: number | null;
   articleId: number | null;
   unite: string;
   description: string;
