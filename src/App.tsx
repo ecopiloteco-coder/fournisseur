@@ -12,6 +12,7 @@ import { NotificationProvider } from './shared/providers/NotificationProvider';
 import { ErrorBoundary } from './shared/components/ErrorBoundary';
 
 
+
 // Pages
 import { Auth } from './features/auth/ui/Auth';
 import SuccessPage from './pages/auth/SuccessPage';
