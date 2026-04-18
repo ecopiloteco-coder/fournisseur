@@ -4,6 +4,7 @@ import { useAuth } from '../../shared/providers/AuthContext';
 import Header from '../../components/layout/Header';
 import Sidebar from '../../components/layout/Sidebar';
 
+
 export function FournisseurLayout() {
   const { user, isLoading, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
