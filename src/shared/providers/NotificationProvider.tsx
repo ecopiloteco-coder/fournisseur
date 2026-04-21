@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { io, Socket } from 'socket.io-client';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react'
 import { jwtDecode } from 'jwt-decode';
 import { getNotificationBackendURL } from '../lib/api-bridge';
 import { useAuth } from './AuthContext';
+import { useRealtimeSocket } from './RealtimeSocketProvider';
 
 interface Notification {
   id: string;
@@ -51,7 +51,9 @@ function getKeycloakIdFromToken(token: string | null): string | undefined {
 
 export const NotificationProvider = ({ children }: NotificationProviderProps) => {
   const { user } = useAuth();
+  const { socket } = useRealtimeSocket();
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const notificationsRef = useRef<Notification[]>([]);
 
   const unreadCount = notifications.filter(n => !n.read).length
 
@@ -167,6 +169,10 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
     showBrowserNotification(notification);
   }
 
+  useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
+
   const sendSignal = (to: string, type: string, message: string, extra: any = {}) => {
     const newSignal = {
       id: Date.now() + Math.random(),
@@ -199,7 +205,7 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
         try {
           const allSignals = JSON.parse(e.newValue)
           const relances = allSignals.filter((s: any) => 
-            s.to === 'supplier' && !notifications.some(n => n.id === String(s.id))
+            s.to === 'supplier' && !notificationsRef.current.some(n => n.id === String(s.id))
           )
           relances.forEach((s: any) => {
             addNotification({
@@ -221,7 +227,7 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
     }
     window.addEventListener('storage', handleStorageChange)
     return () => window.removeEventListener('storage', handleStorageChange)
-  }, [notifications])
+  }, [])
 
   useEffect(() => {
     if (!('Notification' in window)) return;
@@ -251,22 +257,19 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
       }
     };
     void loadNotifications();
-    
-    const newSocket = io(getNotificationBackendURL(), {
-      transports: ['websocket'],
-      auth: { token }
-    });
 
-    newSocket.on('connect', () => {
-      newSocket.emit('join', userId);
-    });
+    if (!socket) return;
 
-    newSocket.on('notification', (notif: any) => {
+    const handleNotification = (notif: any) => {
       addNotification(mapRawNotification(notif));
-    });
+    };
 
-    return () => { newSocket.disconnect(); };
-  }, [user]);
+    socket.on('notification', handleNotification);
+
+    return () => {
+      socket.off('notification', handleNotification);
+    };
+  }, [user, socket]);
 
   return (
     <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, addNotification, sendSignal }}>

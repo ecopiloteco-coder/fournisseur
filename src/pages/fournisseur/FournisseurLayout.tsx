@@ -44,7 +44,7 @@ export function FournisseurLayout() {
       <Header onToggleSidebar={toggleSidebar} />
 
       {/* ── Sidebar gauche du template (mêmes boutons/sections) ── */}
-      <Sidebar isOpen={sidebarOpen} />
+      <Sidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
 
       {/* ── Main Content ── */}
       <main className="app-wrapper">

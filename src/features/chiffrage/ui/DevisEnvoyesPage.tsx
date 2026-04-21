@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowUpRight,
@@ -11,6 +11,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useAuth } from '../../../shared/providers/AuthContext';
+import { useRealtimeSocket } from '../../../shared/providers/RealtimeSocketProvider';
 import {
   fetchDemandesParEntreprise,
   refuserProjet,
@@ -155,6 +156,7 @@ function mapProject(project: ProjetFournisseurResponse): SupplierProjectRow {
 export function DevisEnvoyesPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { socket } = useRealtimeSocket();
 
   const [projects, setProjects] = useState<SupplierProjectRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -170,7 +172,7 @@ export function DevisEnvoyesPage() {
 
   const userEntreprise = user?.keycloakId || (user?.entrepriseId ? String(user.entrepriseId) : '');
 
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     if (!userEntreprise) {
       setIsLoading(false);
       setError('Impossible de charger les projets sans identification fournisseur.');
@@ -187,11 +189,47 @@ export function DevisEnvoyesPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userEntreprise]);
 
   useEffect(() => {
     void loadProjects();
-  }, [userEntreprise]);
+  }, [loadProjects]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const refreshWithRetry = () => {
+      void loadProjects();
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => {
+        void loadProjects();
+      }, 1200);
+    };
+
+    const handleProjectStatusUpdated = () => {
+      refreshWithRetry();
+    };
+
+    const handleNotification = (notif: any) => {
+      const metadata = notif?.metadata || {};
+      const hasProjectHint = Boolean(
+        metadata?.projetFournisseurId || metadata?.interneProjetId || metadata?.actionUrl
+      );
+      if (hasProjectHint) {
+        refreshWithRetry();
+      }
+    };
+
+    socket.on('project-status-updated', handleProjectStatusUpdated);
+    socket.on('notification', handleNotification);
+
+    return () => {
+      socket.off('project-status-updated', handleProjectStatusUpdated);
+      socket.off('notification', handleNotification);
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [socket, loadProjects]);
 
   const filteredProjects = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -310,17 +348,17 @@ export function DevisEnvoyesPage() {
         <div className="card border-0 shadow-sm overflow-hidden">
           <div className="table-responsive text-start">
             <table className="table table-hover align-middle mb-0">
-              <thead className="bg-light">
-                <tr className="small text-muted text-uppercase">
-                  <th className="px-4 py-3">Projet</th>
-                  <th className="py-3">Client</th>
-                  <th className="py-3">Articles</th>
-                  <th className="py-3">Montant HT</th>
-                  <th className="py-3">Date début</th>
-                  <th className="py-3">Date fin</th>
-                  <th className="py-3">Retour devis</th>
-                  <th className="py-3">Statut</th>
-                  <th className="px-4 py-3 text-end">Action</th>
+              <thead className="border-0">
+                <tr className="small text-uppercase border-0" style={{ letterSpacing: '0.5px' }}>
+                  <th className="px-4 py-3 text-white fw-bold" style={{ backgroundColor: '#0978E8', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>Projet</th>
+                  <th className="py-3 text-white fw-bold" style={{ backgroundColor: '#0978E8' }}>Client</th>
+                  <th className="py-3 text-white fw-bold" style={{ backgroundColor: '#0978E8' }}>Articles</th>
+                  <th className="py-3 text-white fw-bold" style={{ backgroundColor: '#0978E8' }}>Montant HT</th>
+                  <th className="py-3 text-white fw-bold" style={{ backgroundColor: '#0978E8' }}>Date début</th>
+                  <th className="py-3 text-white fw-bold" style={{ backgroundColor: '#0978E8' }}>Date fin</th>
+                  <th className="py-3 text-white fw-bold" style={{ backgroundColor: '#0978E8' }}>Retour devis</th>
+                  <th className="py-3 text-white fw-bold" style={{ backgroundColor: '#0978E8' }}>Statut</th>
+                  <th className="px-4 py-3 text-end text-white fw-bold" style={{ backgroundColor: '#0978E8', borderTopRightRadius: '8px', borderBottomRightRadius: '8px' }}>Action</th>
                 </tr>
               </thead>
               <tbody>

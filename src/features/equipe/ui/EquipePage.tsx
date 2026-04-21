@@ -27,12 +27,12 @@ export function EquipePage() {
         </div>
         <div className="table-responsive">
           <table className="table table-hover align-middle mb-0">
-            <thead className="bg-light">
-              <tr className="small text-muted text-uppercase">
-                <th className="px-4 py-3">Membre</th>
-                <th className="py-3">Rôle</th>
-                <th className="py-3">Statut</th>
-                <th className="px-4 py-3 text-end">Action</th>
+            <thead style={{ backgroundColor: '#0978E8' }}>
+              <tr className="small text-uppercase border-0" style={{ letterSpacing: '0.5px' }}>
+                <th className="px-4 py-3 text-white fw-bold bg-transparent" style={{ borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>Membre</th>
+                <th className="py-3 text-white fw-bold bg-transparent">Rôle</th>
+                <th className="py-3 text-white fw-bold bg-transparent">Statut</th>
+                <th className="px-4 py-3 text-end text-white fw-bold bg-transparent" style={{ borderTopRightRadius: '8px', borderBottomRightRadius: '8px' }}>Action</th>
               </tr>
             </thead>
             <tbody>

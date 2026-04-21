@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X, MessageCircle, Clock, ArrowRight, Send } from 'lucide-react';
-import { io, Socket } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../providers/AuthContext';
 import { useTheme } from '../providers/ThemeContext';
+import { useRealtimeSocket } from '../providers/RealtimeSocketProvider';
 import { getNotificationBackendURL } from '../lib/api-bridge';
 import { jwtDecode } from 'jwt-decode';
 
@@ -49,6 +49,7 @@ export const MessagingPanel: React.FC<MessagingPanelProps> = ({ isOpen, onClose 
   const navigate = useNavigate();
   const { user } = useAuth();
   const { theme } = useTheme();
+  const { socket } = useRealtimeSocket();
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -116,7 +117,6 @@ export const MessagingPanel: React.FC<MessagingPanelProps> = ({ isOpen, onClose 
     const roomId = activeConversation.roomId;
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     let mounted = true;
-    let socket: Socket | null = null;
 
     const loadHistory = async () => {
       try {
@@ -146,16 +146,7 @@ export const MessagingPanel: React.FC<MessagingPanelProps> = ({ isOpen, onClose 
 
     void loadHistory();
 
-    socket = io(getNotificationBackendURL(), {
-      transports: ['websocket'],
-      auth: { token },
-    });
-
-    socket.on('connect', () => {
-      socket?.emit('join-room', roomId);
-    });
-
-    socket.on('chat-message', (m: any) => {
+    const handleChatMessage = (m: any) => {
       if (m.roomId !== roomId) return;
       const nextId = m._id || `${Date.now()}-${Math.random()}`;
       setChatMessages((prev) => {
@@ -171,13 +162,16 @@ export const MessagingPanel: React.FC<MessagingPanelProps> = ({ isOpen, onClose 
           },
         ];
       });
-    });
+    };
+
+    socket?.emit('join-room', roomId);
+    socket?.on('chat-message', handleChatMessage);
 
     return () => {
       mounted = false;
-      socket?.disconnect();
+      socket?.off('chat-message', handleChatMessage);
     };
-  }, [activeConversation, chatUserId, token]);
+  }, [activeConversation, chatUserId, token, socket]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });

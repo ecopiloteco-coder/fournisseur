@@ -1,0 +1,1317 @@
+/* ============================================================
+   EcoPilot Fournisseur — Premium UI Overrides
+   Style: Stripe / Notion / Linear — Enterprise SaaS
+   ============================================================ */
+
+/* ──────────────────────────────────────────────────────────
+   1. DESIGN TOKENS (CSS Variables)
+   ────────────────────────────────────────────────────────── */
+:root {
+  /* Color Palette */
+  --eco-bg:             #F7F9FC;
+  --eco-surface:        #FFFFFF;
+  --eco-sidebar-bg:     #FAFBFF;
+  --eco-primary:        #4A7CFA;
+  --eco-primary-hover:  #3B6DE8;
+  --eco-primary-soft:   rgba(74, 124, 250, 0.08);
+  --eco-primary-mid:    rgba(74, 124, 250, 0.15);
+
+  --eco-success:        #22C55E;
+  --eco-success-soft:   rgba(34, 197, 94, 0.10);
+  --eco-warning:        #F59E0B;
+  --eco-warning-soft:   rgba(245, 158, 11, 0.10);
+  --eco-danger:         #EF4444;
+  --eco-danger-soft:    rgba(239, 68, 68, 0.10);
+  --eco-info:           #3B82F6;
+  --eco-info-soft:      rgba(59, 130, 246, 0.10);
+
+  --eco-text-primary:   #1E2235;
+  --eco-text-secondary: #5A6B8A;
+  --eco-text-muted:     #9CA3AF;
+  --eco-border:         #E8ECF4;
+  --eco-border-hover:   #C8D3E8;
+
+  /* Shadows */
+  --eco-shadow-xs:  0 1px 2px rgba(30, 34, 53, 0.04);
+  --eco-shadow-sm:  0 1px 6px rgba(74, 124, 250, 0.07), 0 4px 16px rgba(30, 34, 53, 0.05);
+  --eco-shadow-md:  0 4px 20px rgba(74, 124, 250, 0.10), 0 2px 8px rgba(30, 34, 53, 0.06);
+  --eco-shadow-lg:  0 8px 40px rgba(74, 124, 250, 0.14), 0 2px 12px rgba(30, 34, 53, 0.08);
+
+  /* Radius */
+  --eco-radius-sm:  8px;
+  --eco-radius-md:  12px;
+  --eco-radius-lg:  16px;
+  --eco-radius-xl:  20px;
+  --eco-radius-pill: 999px;
+
+  /* Transitions */
+  --eco-transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  --eco-transition-fast: all 0.10s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ──────────────────────────────────────────────────────────
+   2. GLOBAL BASE
+   ────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  background-color: var(--eco-bg) !important;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  font-size: 14px;
+  color: var(--eco-text-primary) !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Force table headers to inherit thead background color */
+.table thead th {
+  background-color: transparent !important;
+  color: inherit !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   3. LAYOUT SHELL
+   ────────────────────────────────────────────────────────── */
+.page-layout {
+  background-color: var(--eco-bg) !important;
+}
+
+/* La sidebar doit rester AU-DESSUS du header pour que le logo soit visible intact sur le côté */
+.app-menubar {
+  z-index: 1150 !important;
+}
+
+.app-wrapper {
+  background-color: var(--eco-bg) !important;
+  min-height: 100vh;
+}
+
+.app-wrapper .container,
+.app-wrapper .container-fluid {
+  padding-top: 28px;
+  padding-bottom: 40px;
+}
+
+/* ──────────────────────────────────────────────────────────
+   4. HEADER
+   ────────────────────────────────────────────────────────── */
+.app-header {
+  background: var(--eco-surface) !important;
+  border-bottom: 1px solid var(--eco-border) !important;
+  box-shadow: 0 1px 0 var(--eco-border), var(--eco-shadow-xs) !important;
+  backdrop-filter: none !important;
+  height: 60px !important;
+  /* Header SOUS la sidebar */
+  z-index: 1050 !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+}
+
+.app-header-inner {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+}
+
+/* Hamburger toggler */
+.app-toggler {
+  width: 36px;
+  height: 36px;
+  background: transparent !important;
+  border: none !important;
+  border-radius: var(--eco-radius-sm) !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px !important;
+  cursor: pointer;
+  transition: var(--eco-transition) !important;
+}
+
+.app-toggler:hover {
+  background: var(--eco-primary-soft) !important;
+}
+
+.app-toggler span {
+  display: block;
+  width: 18px;
+  height: 1.5px;
+  background-color: var(--eco-text-secondary) !important;
+  border-radius: 2px;
+  transition: var(--eco-transition) !important;
+}
+
+/* Header action buttons */
+.btn-action-gray,
+.btn-icon.btn-action-gray {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  border: none !important;
+  color: var(--eco-text-secondary) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: var(--eco-transition) !important;
+  font-size: 15px !important;
+  box-shadow: none !important;
+}
+
+.btn-action-gray:hover,
+.btn-icon.btn-action-gray:hover {
+  background: var(--eco-primary-soft) !important;
+  color: var(--eco-primary) !important;
+  transform: none !important;
+}
+
+/* Header vertical divider */
+.app-header .vr {
+  opacity: 0.12 !important;
+  background-color: var(--eco-text-secondary) !important;
+  width: 1px !important;
+  margin: 10px 4px !important;
+}
+
+/* Profile dropdown trigger */
+.app-header .dropdown > a,
+.app-header .dropdown > a:hover {
+  text-decoration: none !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   5. SIDEBAR
+   ────────────────────────────────────────────────────────── */
+.app-menubar {
+  background: var(--eco-sidebar-bg) !important;
+  border-right: 1px solid var(--eco-border) !important;
+  box-shadow: 1px 0 0 var(--eco-border) !important;
+}
+
+/* Brand / Logo area */
+.app-navbar-brand {
+  padding: 12px 18px !important;
+  border-bottom: 1px solid var(--eco-border) !important;
+  min-height: 60px !important;
+  height: 60px !important;
+  display: flex !important;
+  align-items: center !important;
+  flex-shrink: 0;
+  background: var(--eco-sidebar-bg) !important;
+  overflow: visible !important;
+}
+
+.app-navbar-brand .navbar-brand-logo,
+.app-navbar-brand .navbar-brand-mini {
+  display: flex !important;
+  align-items: center !important;
+  text-decoration: none !important;
+}
+
+/* Logo image — toujours visible */
+.app-navbar-brand img {
+  max-height: 34px !important;
+  width: auto !important;
+  display: block !important;
+  object-fit: contain !important;
+}
+
+/* Texte EcoPilot en mode mini */
+.app-navbar-brand h4 {
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  color: var(--eco-primary) !important;
+  margin: 0 !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* Forcer la visibilité — override le template qui peut cacher */
+[data-app-sidebar="full"] .app-navbar-brand .navbar-brand-logo { display: flex !important; }
+[data-app-sidebar="mini"] .app-navbar-brand .navbar-brand-logo { display: none !important; }
+[data-app-sidebar="mini"] .app-navbar-brand .navbar-brand-mini { display: flex !important; }
+[data-app-sidebar="mini"] .app-navbar-brand { justify-content: center !important; padding: 12px 8px !important; }
+
+/* Nav container */
+.app-navbar {
+  padding: 12px 12px !important;
+}
+
+.menubar {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* Section headings */
+.menu-heading {
+  padding: 16px 10px 6px !important;
+  list-style: none;
+}
+
+.menu-heading > .menu-label {
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: var(--eco-text-muted) !important;
+}
+
+/* Nav items */
+.menu-item {
+  list-style: none;
+  margin-bottom: 2px !important;
+}
+
+.menu-link {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 9px 12px !important;
+  border-radius: var(--eco-radius-sm) !important;
+  color: var(--eco-text-secondary) !important;
+  text-decoration: none !important;
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  transition: var(--eco-transition) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.menu-link i {
+  font-size: 15px !important;
+  width: 18px !important;
+  flex-shrink: 0;
+  transition: var(--eco-transition) !important;
+}
+
+.menu-link:hover {
+  background: var(--eco-primary-soft) !important;
+  color: var(--eco-primary) !important;
+  text-decoration: none !important;
+}
+
+.menu-link:hover i {
+  color: var(--eco-primary) !important;
+}
+
+.menu-link.active,
+.menu-link[aria-current="page"] {
+  background: var(--eco-primary-soft) !important;
+  color: var(--eco-primary) !important;
+  font-weight: 600 !important;
+}
+
+.menu-link.active i,
+.menu-link[aria-current="page"] i {
+  color: var(--eco-primary) !important;
+}
+
+/* Active indicator bar */
+.menu-link.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  background: var(--eco-primary);
+  border-radius: 0 3px 3px 0;
+}
+
+/* Sidebar footer */
+.app-footer {
+  padding: 12px !important;
+  border-top: 1px solid var(--eco-border) !important;
+}
+
+.btn-app-nav {
+  border-radius: var(--eco-radius-sm) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: var(--eco-text-secondary) !important;
+  border-color: var(--eco-border) !important;
+  background: transparent !important;
+  transition: var(--eco-transition) !important;
+}
+
+.btn-app-nav:hover {
+  background: var(--eco-primary-soft) !important;
+  border-color: var(--eco-primary-mid) !important;
+  color: var(--eco-primary) !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   6. CARDS
+   ────────────────────────────────────────────────────────── */
+.card {
+  background: var(--eco-surface) !important;
+  border: 1px solid var(--eco-border) !important;
+  border-radius: var(--eco-radius-md) !important;
+  box-shadow: var(--eco-shadow-sm) !important;
+  transition: var(--eco-transition) !important;
+  overflow: hidden;
+}
+
+.card.border-0 {
+  border: 1px solid var(--eco-border) !important;
+}
+
+.card:hover {
+  box-shadow: var(--eco-shadow-md) !important;
+}
+
+.card-header {
+  background: var(--eco-surface) !important;
+  border-bottom: 1px solid var(--eco-border) !important;
+  padding: 16px 20px !important;
+  font-weight: 600 !important;
+  color: var(--eco-text-primary) !important;
+  font-size: 14px !important;
+}
+
+.card-body {
+  padding: 20px !important;
+}
+
+/* KPI / Stat Cards */
+.card .card-body .avatar-lg {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 10px !important;
+  font-size: 18px !important;
+}
+
+/* Card hover lift effect */
+.card-action {
+  transition: var(--eco-transition) !important;
+  cursor: pointer;
+}
+
+.card-action:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: var(--eco-shadow-md) !important;
+  border-color: var(--eco-primary-mid) !important;
+}
+
+/* Shadow overrides */
+.shadow-sm { box-shadow: var(--eco-shadow-sm) !important; }
+.shadow-md { box-shadow: var(--eco-shadow-md) !important; }
+
+/* ──────────────────────────────────────────────────────────
+   7. BUTTONS
+   ────────────────────────────────────────────────────────── */
+.btn {
+  border-radius: var(--eco-radius-sm) !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+  letter-spacing: 0.01em !important;
+  transition: var(--eco-transition) !important;
+  line-height: 1.4 !important;
+  padding: 7px 16px !important;
+}
+
+.btn-primary {
+  background: var(--eco-primary) !important;
+  border-color: var(--eco-primary) !important;
+  color: #fff !important;
+  box-shadow: 0 1px 3px rgba(74, 124, 250, 0.25), 0 4px 12px rgba(74, 124, 250, 0.15) !important;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background: var(--eco-primary-hover) !important;
+  border-color: var(--eco-primary-hover) !important;
+  box-shadow: 0 2px 6px rgba(74, 124, 250, 0.35), 0 6px 20px rgba(74, 124, 250, 0.20) !important;
+  transform: translateY(-1px) !important;
+}
+
+.btn-primary:active {
+  transform: translateY(0) !important;
+}
+
+.btn-success {
+  background: var(--eco-success) !important;
+  border-color: var(--eco-success) !important;
+  color: #fff !important;
+  box-shadow: 0 1px 3px rgba(34, 197, 94, 0.25) !important;
+}
+
+.btn-success:hover {
+  background: #16a34a !important;
+  border-color: #16a34a !important;
+  transform: translateY(-1px) !important;
+}
+
+.btn-warning {
+  background: var(--eco-warning) !important;
+  border-color: var(--eco-warning) !important;
+  color: #fff !important;
+}
+
+.btn-danger {
+  background: var(--eco-danger) !important;
+  border-color: var(--eco-danger) !important;
+  color: #fff !important;
+}
+
+.btn-outline-primary {
+  border-color: var(--eco-primary) !important;
+  color: var(--eco-primary) !important;
+  background: transparent !important;
+}
+
+.btn-outline-primary:hover {
+  background: var(--eco-primary-soft) !important;
+  transform: translateY(-1px) !important;
+}
+
+.btn-light {
+  background: #F0F4FF !important;
+  border-color: var(--eco-border) !important;
+  color: var(--eco-text-secondary) !important;
+}
+
+.btn-light:hover {
+  background: var(--eco-primary-soft) !important;
+  color: var(--eco-primary) !important;
+}
+
+.btn-sm {
+  padding: 5px 12px !important;
+  font-size: 12.5px !important;
+}
+
+.btn-lg {
+  padding: 10px 22px !important;
+  font-size: 14px !important;
+  border-radius: var(--eco-radius-md) !important;
+}
+
+.rounded-pill { border-radius: var(--eco-radius-pill) !important; }
+
+/* btn-icon utility */
+.btn-icon {
+  width: 34px !important;
+  height: 34px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   8. BADGES & STATUS
+   ────────────────────────────────────────────────────────── */
+.badge {
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  padding: 4px 10px !important;
+  border-radius: 6px !important;
+  letter-spacing: 0.01em !important;
+}
+
+/* Status: Active / Accepté */
+.badge.bg-success,
+.badge.text-success {
+  background: var(--eco-success-soft) !important;
+  color: #15803d !important;
+  border: 1px solid rgba(34, 197, 94, 0.20) !important;
+}
+
+/* Status: Warning / Nouveau / En attente */
+.badge.bg-warning,
+.badge.text-warning {
+  background: var(--eco-warning-soft) !important;
+  color: #b45309 !important;
+  border: 1px solid rgba(245, 158, 11, 0.20) !important;
+}
+
+/* Status: Danger / Refusé */
+.badge.bg-danger,
+.badge.text-danger {
+  background: var(--eco-danger-soft) !important;
+  color: #b91c1c !important;
+  border: 1px solid rgba(239, 68, 68, 0.20) !important;
+}
+
+/* Status: Info / En cours */
+.badge.bg-info,
+.badge.text-info {
+  background: var(--eco-info-soft) !important;
+  color: #1d4ed8 !important;
+  border: 1px solid rgba(59, 130, 246, 0.20) !important;
+}
+
+/* Status: Primary / Nouveau */
+.badge.bg-primary,
+.badge.text-primary {
+  background: var(--eco-primary-soft) !important;
+  color: var(--eco-primary) !important;
+  border: 1px solid var(--eco-primary-mid) !important;
+}
+
+/* Dark badge */
+.badge.bg-dark {
+  background: var(--eco-text-primary) !important;
+  color: #fff !important;
+}
+
+/* Light badge */
+.badge.bg-light {
+  background: #F0F4FF !important;
+  color: var(--eco-text-secondary) !important;
+  border: 1px solid var(--eco-border) !important;
+}
+
+/* Rounded pill badges */
+.badge.rounded-pill { border-radius: var(--eco-radius-pill) !important; }
+
+/* Notification dot on buttons */
+.position-absolute.bg-danger.border-light.rounded-circle.p-1 {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  background: var(--eco-danger) !important;
+  border: 2px solid var(--eco-surface) !important;
+  padding: 0 !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   9. TABLES
+   ────────────────────────────────────────────────────────── */
+.table {
+  color: var(--eco-text-primary) !important;
+  font-size: 13.5px !important;
+  border-color: var(--eco-border) !important;
+  margin-bottom: 0 !important;
+}
+
+.table thead th,
+.table thead tr th {
+  background: #F4F7FF !important;
+  color: var(--eco-text-muted) !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  letter-spacing: 0.07em !important;
+  text-transform: uppercase !important;
+  border-bottom: 1px solid var(--eco-border) !important;
+  border-top: none !important;
+  padding: 12px 16px !important;
+  white-space: nowrap;
+}
+
+.table tbody tr td {
+  border-bottom: 1px solid var(--eco-border) !important;
+  border-top: none !important;
+  padding: 13px 16px !important;
+  vertical-align: middle !important;
+  color: var(--eco-text-primary) !important;
+  font-size: 13.5px !important;
+}
+
+.table-hover tbody tr:hover td {
+  background: rgba(74, 124, 250, 0.025) !important;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none !important;
+}
+
+/* Table inside card */
+.card .table-responsive { border-radius: 0 0 var(--eco-radius-md) var(--eco-radius-md); }
+
+/* ──────────────────────────────────────────────────────────
+   10. FORMS
+   ────────────────────────────────────────────────────────── */
+.form-control,
+.form-select {
+  border: 1.5px solid var(--eco-border) !important;
+  border-radius: var(--eco-radius-sm) !important;
+  background: var(--eco-surface) !important;
+  color: var(--eco-text-primary) !important;
+  font-size: 13.5px !important;
+  padding: 9px 13px !important;
+  transition: var(--eco-transition) !important;
+  box-shadow: none !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--eco-primary) !important;
+  box-shadow: 0 0 0 3px var(--eco-primary-soft) !important;
+  background: var(--eco-surface) !important;
+  color: var(--eco-text-primary) !important;
+}
+
+.form-control::placeholder {
+  color: var(--eco-text-muted) !important;
+  font-size: 13px !important;
+}
+
+.form-label {
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  color: var(--eco-text-primary) !important;
+  margin-bottom: 6px !important;
+}
+
+.input-group {
+  border-radius: var(--eco-radius-sm) !important;
+}
+
+.input-group .form-control {
+  border-radius: 0 !important;
+}
+
+.input-group .input-group-text {
+  background: var(--eco-surface) !important;
+  border: 1.5px solid var(--eco-border) !important;
+  color: var(--eco-text-muted) !important;
+  border-right: none !important;
+}
+
+.input-group .form-control:last-child {
+  border-left: none !important;
+}
+
+.input-group:focus-within {
+  box-shadow: 0 0 0 3px var(--eco-primary-soft) !important;
+  border-radius: var(--eco-radius-sm) !important;
+}
+
+.input-group:focus-within .input-group-text,
+.input-group:focus-within .form-control {
+  border-color: var(--eco-primary) !important;
+  box-shadow: none !important;
+}
+
+/* bg-light input override */
+.form-control.bg-light,
+.form-select.bg-light,
+textarea.bg-light {
+  background: #F4F7FF !important;
+  border-color: transparent !important;
+}
+
+.form-control.bg-light:focus,
+.form-select.bg-light:focus,
+textarea.bg-light:focus {
+  background: var(--eco-surface) !important;
+  border-color: var(--eco-primary) !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   11. PAGE HEADER
+   ────────────────────────────────────────────────────────── */
+.app-page-title,
+h1.app-page-title {
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  color: var(--eco-text-primary) !important;
+  margin-bottom: 4px !important;
+  letter-spacing: -0.01em !important;
+}
+
+.app-page-head {
+  margin-bottom: 24px !important;
+}
+
+/* Breadcrumb */
+.breadcrumb {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-size: 12px !important;
+}
+
+.breadcrumb-item a {
+  color: var(--eco-primary) !important;
+  text-decoration: none !important;
+}
+
+.breadcrumb-item.active {
+  color: var(--eco-text-muted) !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   12. KANBAN BOARD
+   ────────────────────────────────────────────────────────── */
+/* Column headers */
+.card.bg-light {
+  background: #F4F7FF !important;
+}
+
+.card.bg-light.bg-opacity-50 {
+  background: rgba(244, 247, 255, 0.7) !important;
+  border: 1.5px solid var(--eco-border) !important;
+}
+
+/* Kanban column top border override */
+.border-top.border-primary { border-top-color: var(--eco-primary) !important; }
+.border-top.border-success { border-top-color: var(--eco-success) !important; }
+.border-top.border-warning { border-top-color: var(--eco-warning) !important; }
+.border-top.border-danger  { border-top-color: var(--eco-danger) !important; }
+
+/* Kanban card */
+.task-list .card {
+  border: 1.5px solid var(--eco-border) !important;
+  border-radius: var(--eco-radius-md) !important;
+  box-shadow: var(--eco-shadow-xs) !important;
+  transition: var(--eco-transition) !important;
+}
+
+.task-list .card:hover {
+  border-color: var(--eco-primary-mid) !important;
+  box-shadow: var(--eco-shadow-sm) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Empty column state */
+.border-dashed {
+  border: 1.5px dashed var(--eco-border) !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   13. MODALS
+   ────────────────────────────────────────────────────────── */
+.modal-content {
+  border: none !important;
+  border-radius: var(--eco-radius-lg) !important;
+  box-shadow: var(--eco-shadow-lg) !important;
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 20px 24px !important;
+  border-bottom: 1px solid var(--eco-border) !important;
+}
+
+.modal-header .modal-title {
+  font-weight: 700 !important;
+  font-size: 15px !important;
+  color: var(--eco-text-primary) !important;
+}
+
+.modal-body {
+  padding: 24px !important;
+}
+
+.modal-footer {
+  padding: 16px 24px !important;
+  border-top: 1px solid var(--eco-border) !important;
+  background: var(--eco-bg) !important;
+}
+
+/* Modal bg overlay */
+.modal-backdrop,
+div[style*="rgba(0,0,0,0.5)"] {
+  background: rgba(15, 20, 40, 0.55) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   14. DROPDOWNS
+   ────────────────────────────────────────────────────────── */
+.dropdown-menu {
+  border: 1px solid var(--eco-border) !important;
+  border-radius: var(--eco-radius-md) !important;
+  box-shadow: var(--eco-shadow-md) !important;
+  padding: 6px !important;
+  background: var(--eco-surface) !important;
+  min-width: 200px !important;
+}
+
+.dropdown-item {
+  border-radius: var(--eco-radius-sm) !important;
+  font-size: 13.5px !important;
+  color: var(--eco-text-secondary) !important;
+  padding: 8px 12px !important;
+  transition: var(--eco-transition) !important;
+  font-weight: 500 !important;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background: var(--eco-primary-soft) !important;
+  color: var(--eco-primary) !important;
+}
+
+.dropdown-item.text-danger:hover {
+  background: var(--eco-danger-soft) !important;
+  color: var(--eco-danger) !important;
+}
+
+.dropdown-divider {
+  border-color: var(--eco-border) !important;
+  margin: 4px 0 !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   15. ALERTS
+   ────────────────────────────────────────────────────────── */
+.alert {
+  border-radius: var(--eco-radius-md) !important;
+  border: none !important;
+  font-size: 13.5px !important;
+  padding: 14px 18px !important;
+}
+
+.alert-danger {
+  background: var(--eco-danger-soft) !important;
+  color: #b91c1c !important;
+  border-left: 3px solid var(--eco-danger) !important;
+}
+
+.alert-success {
+  background: var(--eco-success-soft) !important;
+  color: #15803d !important;
+  border-left: 3px solid var(--eco-success) !important;
+}
+
+.alert-warning {
+  background: var(--eco-warning-soft) !important;
+  color: #b45309 !important;
+  border-left: 3px solid var(--eco-warning) !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   16. AVATAR
+   ────────────────────────────────────────────────────────── */
+.avatar {
+  border-radius: 50% !important;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-sm { width: 34px !important; height: 34px !important; }
+.avatar-md { width: 40px !important; height: 40px !important; }
+.avatar-lg { width: 48px !important; height: 48px !important; }
+
+/* Avatar initials */
+.avatar.bg-primary { background: var(--eco-primary-soft) !important; color: var(--eco-primary) !important; font-weight: 700; font-size: 13px; }
+.avatar.bg-success { background: var(--eco-success-soft) !important; color: #15803d !important; font-weight: 700; }
+
+/* Avatar status dot */
+.avatar-status-success::after {
+  content: '';
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--eco-success);
+  border: 2px solid var(--eco-surface);
+}
+
+/* ──────────────────────────────────────────────────────────
+   17. SPINNER / LOADING
+   ────────────────────────────────────────────────────────── */
+.spinner-border.text-primary {
+  color: var(--eco-primary) !important;
+}
+
+/* Skeleton loaders */
+@keyframes eco-skeleton-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  display: block;
+  border-radius: var(--eco-radius-sm);
+  background: linear-gradient(90deg, #eef1f7 25%, #f5f7fc 50%, #eef1f7 75%);
+  background-size: 800px 100%;
+  animation: eco-skeleton-shimmer 1.5s infinite linear;
+}
+
+/* KPI card skeletons */
+.skeleton-kpi { width: 100%; height: 88px; }
+.skeleton-text { height: 14px; width: 60%; margin-bottom: 8px; }
+.skeleton-text.short { width: 40%; }
+
+/* ──────────────────────────────────────────────────────────
+   18. TEXT UTILITIES
+   ────────────────────────────────────────────────────────── */
+.text-primary { color: var(--eco-primary) !important; }
+.text-success { color: var(--eco-success) !important; }
+.text-warning { color: var(--eco-warning) !important; }
+.text-danger  { color: var(--eco-danger) !important; }
+.text-info    { color: var(--eco-info) !important; }
+.text-dark    { color: var(--eco-text-primary) !important; }
+.text-muted   { color: var(--eco-text-muted) !important; }
+
+.fw-bold    { font-weight: 700 !important; }
+.fw-semibold { font-weight: 600 !important; }
+.fw-medium  { font-weight: 500 !important; }
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--eco-text-primary) !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+}
+
+h5 { font-size: 15px !important; }
+h6 { font-size: 13.5px !important; }
+small, .small { font-size: 12px !important; }
+
+/* ──────────────────────────────────────────────────────────
+   19. BACKGROUND UTILITIES
+   ────────────────────────────────────────────────────────── */
+.bg-primary     { background-color: var(--eco-primary) !important; }
+.bg-light       { background-color: #F4F7FF !important; }
+.bg-white       { background-color: var(--eco-surface) !important; }
+
+.bg-primary.bg-opacity-10 { background-color: var(--eco-primary-soft) !important; }
+.bg-success.bg-opacity-10 { background-color: var(--eco-success-soft) !important; }
+.bg-warning.bg-opacity-10 { background-color: var(--eco-warning-soft) !important; }
+.bg-danger.bg-opacity-10  { background-color: var(--eco-danger-soft) !important; }
+.bg-info.bg-opacity-10    { background-color: var(--eco-info-soft) !important; }
+
+/* ──────────────────────────────────────────────────────────
+   20. PROGRESS BARS
+   ────────────────────────────────────────────────────────── */
+.progress {
+  border-radius: var(--eco-radius-pill) !important;
+  background: #EEF1F8 !important;
+  height: 6px !important;
+  overflow: hidden;
+}
+
+.progress-bar {
+  border-radius: var(--eco-radius-pill) !important;
+  background: var(--eco-primary) !important;
+}
+
+.progress-bar.bg-success { background: var(--eco-success) !important; }
+.progress-bar.bg-warning { background: var(--eco-warning) !important; }
+.progress-bar.bg-danger  { background: var(--eco-danger) !important; }
+
+/* ──────────────────────────────────────────────────────────
+   21. PAGINATION
+   ────────────────────────────────────────────────────────── */
+.pagination {
+  gap: 4px !important;
+  align-items: center;
+}
+
+.page-link {
+  border-radius: var(--eco-radius-sm) !important;
+  border: 1px solid var(--eco-border) !important;
+  color: var(--eco-text-secondary) !important;
+  background: var(--eco-surface) !important;
+  padding: 6px 12px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  transition: var(--eco-transition) !important;
+}
+
+.page-link:hover {
+  background: var(--eco-primary-soft) !important;
+  border-color: var(--eco-primary-mid) !important;
+  color: var(--eco-primary) !important;
+}
+
+.page-item.active .page-link {
+  background: var(--eco-primary) !important;
+  border-color: var(--eco-primary) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 8px rgba(74, 124, 250, 0.30) !important;
+}
+
+.page-item.disabled .page-link {
+  opacity: 0.4 !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   22. TABS / BTN-GROUP
+   ────────────────────────────────────────────────────────── */
+.btn-group {
+  border-radius: var(--eco-radius-sm) !important;
+}
+
+.btn-group .btn {
+  border-radius: var(--eco-radius-sm) !important;
+}
+
+.nav-tabs {
+  border-bottom: 2px solid var(--eco-border) !important;
+  gap: 4px;
+}
+
+.nav-tabs .nav-link {
+  border: none !important;
+  border-radius: var(--eco-radius-sm) var(--eco-radius-sm) 0 0 !important;
+  color: var(--eco-text-muted) !important;
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  padding: 10px 16px !important;
+  transition: var(--eco-transition) !important;
+}
+
+.nav-tabs .nav-link:hover {
+  color: var(--eco-primary) !important;
+  background: var(--eco-primary-soft) !important;
+}
+
+.nav-tabs .nav-link.active {
+  color: var(--eco-primary) !important;
+  font-weight: 700 !important;
+  background: transparent !important;
+  border-bottom: 2px solid var(--eco-primary) !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   23. LIST GROUPS
+   ────────────────────────────────────────────────────────── */
+.list-group-item {
+  border-color: var(--eco-border) !important;
+  background: transparent !important;
+  color: var(--eco-text-primary) !important;
+  font-size: 13.5px !important;
+  padding: 12px 16px !important;
+}
+
+.list-group-flush .list-group-item {
+  border-left: none !important;
+  border-right: none !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   24. TOASTS / SONNER
+   ────────────────────────────────────────────────────────── */
+[data-sonner-toast] {
+  border-radius: var(--eco-radius-md) !important;
+  box-shadow: var(--eco-shadow-md) !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 13.5px !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   25. SCROLLBAR
+   ────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D1D7E8;
+  border-radius: var(--eco-radius-pill);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B0BADA;
+}
+
+/* ──────────────────────────────────────────────────────────
+   26. DASHBOARD-SPECIFIC: KPI Cards
+   ────────────────────────────────────────────────────────── */
+/* Welcome banner like the screenshots */
+.card.bg-info,
+.card.bg-warning,
+.card.bg-primary {
+  border: none !important;
+}
+
+/* Soften shadow-none cards */
+.shadow-none {
+  box-shadow: none !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   27. CATALOGUE / HISTORIQUE TABLES
+   ────────────────────────────────────────────────────────── */
+/* Action button row */
+.table .btn-group-sm .btn {
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   28. DARK MODE OVERRIDES
+   ────────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --eco-bg:             #111827;
+  --eco-surface:        #1F2A3C;
+  --eco-sidebar-bg:     #192233;
+  --eco-primary-soft:   rgba(74, 124, 250, 0.12);
+  --eco-primary-mid:    rgba(74, 124, 250, 0.22);
+  --eco-text-primary:   #E2E8F0;
+  --eco-text-secondary: #94A3B8;
+  --eco-text-muted:     #64748B;
+  --eco-border:         rgba(255,255,255,0.07);
+  --eco-border-hover:   rgba(255,255,255,0.13);
+
+  --eco-success-soft:   rgba(34, 197, 94, 0.12);
+  --eco-warning-soft:   rgba(245, 158, 11, 0.12);
+  --eco-danger-soft:    rgba(239, 68, 68, 0.12);
+  --eco-info-soft:      rgba(59, 130, 246, 0.12);
+
+  --eco-shadow-xs:  0 1px 3px rgba(0,0,0,0.25);
+  --eco-shadow-sm:  0 2px 8px rgba(0,0,0,0.30), 0 1px 3px rgba(0,0,0,0.20);
+  --eco-shadow-md:  0 4px 20px rgba(0,0,0,0.40), 0 2px 8px rgba(0,0,0,0.25);
+  --eco-shadow-lg:  0 8px 40px rgba(0,0,0,0.50);
+}
+
+[data-theme="dark"] .table thead th,
+[data-theme="dark"] .table thead tr th {
+  background: rgba(255,255,255,0.03) !important;
+}
+
+[data-theme="dark"] .table-hover tbody tr:hover td {
+  background: rgba(74, 124, 250, 0.04) !important;
+}
+
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select {
+  background: rgba(255,255,255,0.04) !important;
+  color: var(--eco-text-primary) !important;
+}
+
+[data-theme="dark"] .dropdown-menu {
+  background: #1F2A3C !important;
+}
+
+[data-theme="dark"] .modal-content {
+  background: #1F2A3C !important;
+}
+
+[data-theme="dark"] .modal-footer {
+  background: #192233 !important;
+}
+
+[data-theme="dark"] .card.bg-light,
+[data-theme="dark"] .bg-light {
+  background: rgba(255,255,255,0.03) !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   29. MICRO-ANIMATIONS
+   ────────────────────────────────────────────────────────── */
+@keyframes eco-fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes eco-scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Apply entry animations to cards and main page sections */
+.app-page-head { animation: eco-fadeIn 0.3s ease both; }
+.card { animation: eco-fadeIn 0.25s ease both; }
+
+/* Stagger for card grids */
+.row .card { animation-delay: calc(var(--stagger, 0) * 0.05s); }
+
+/* Modal zoom-in applied via class */
+.animate__zoomIn { animation: eco-scaleIn 0.22s ease both !important; }
+
+/* ──────────────────────────────────────────────────────────
+   30. RESPONSIVE
+   ────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .app-wrapper .container {
+    padding-top: 16px !important;
+    padding-bottom: 24px !important;
+  }
+
+  .card-body {
+    padding: 16px !important;
+  }
+
+  .app-page-title {
+    font-size: 18px !important;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────
+   31. SIDEBAR TOGGLE BUTTON (dans la brand area)
+   ────────────────────────────────────────────────────────── */
+
+/* La zone brand prend tout la largeur entre logo et btn */
+.app-navbar-brand {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px;
+}
+
+/* Bouton fermer/réduire la sidebar */
+.sidebar-toggle-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 30px !important;
+  height: 30px !important;
+  border: none !important;
+  background: transparent !important;
+  border-radius: var(--eco-radius-sm) !important;
+  color: var(--eco-text-muted) !important;
+  cursor: pointer !important;
+  transition: var(--eco-transition) !important;
+  padding: 0 !important;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.sidebar-toggle-btn:hover {
+  background: var(--eco-primary-soft) !important;
+  color: var(--eco-primary) !important;
+}
+
+.sidebar-toggle-btn:active {
+  background: var(--eco-primary-mid) !important;
+  transform: scale(0.93) !important;
+}
+
+.sidebar-toggle-icon {
+  font-size: 13px !important;
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* En mode mini → flèche tourne vers la droite */
+[data-app-sidebar="mini"] .sidebar-toggle-icon,
+[data-app-sidebar="mini-hover"] .sidebar-toggle-icon {
+  transform: rotate(180deg) !important;
+}
+
+/* En mode mini → cacher le texte ECO dans brand */
+[data-app-sidebar="mini"] .sidebar-toggle-btn {
+  display: none !important;
+}
+
+/* Logo full toujours visible en mode full */
+[data-app-sidebar="full"] .navbar-brand-logo {
+  display: flex !important;
+}
+
+[data-app-sidebar="full"] .navbar-brand-mini {
+  display: none !important;
+}

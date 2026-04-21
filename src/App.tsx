@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './shared/providers/ThemeContext';
 import { LoadingProvider } from './shared/providers/LoadingContext';
 import { AuthProvider } from './shared/providers/AuthContext';
+import { RealtimeSocketProvider } from './shared/providers/RealtimeSocketProvider';
 import { NotificationProvider } from './shared/providers/NotificationProvider';
 
 // Components
@@ -39,7 +40,8 @@ function App() {
           <LoadingProvider>
             <HashRouter>
                 <AuthProvider>
-                  <NotificationProvider>
+                  <RealtimeSocketProvider>
+                    <NotificationProvider>
                     <Suspense
                     fallback={
                       <div className="d-flex align-items-center justify-content-center min-vh-100">
@@ -66,7 +68,8 @@ function App() {
                       <Route path="*" element={<Navigate to="/auth" replace />} />
                     </Routes>
                   </Suspense>
-                  </NotificationProvider>
+                    </NotificationProvider>
+                  </RealtimeSocketProvider>
                 </AuthProvider>
               </HashRouter>
           </LoadingProvider>

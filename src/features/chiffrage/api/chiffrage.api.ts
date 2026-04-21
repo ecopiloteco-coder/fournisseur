@@ -71,6 +71,7 @@ export interface ProjetFournisseurResponse {
   prixTotal: number;
   prixVente: number | null;
   fournisseurNom?: string;
+  creeParNom?: string;
   // Fournisseur refusal motifs
   motifRefusFournisseur?: string;
   descriptionRefusFournisseur?: string;

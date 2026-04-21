@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../shared/providers/AuthContext';
 import { fetchDemandeById, chiffrerArticle, soumettreDevis, ProjetFournisseurResponse, uploadArticleFichier, signalerArticle, refuserProjet, updateProjetStatus } from '../api/chiffrage.api';
-import { io, Socket } from 'socket.io-client';
 import { getBackendURL, getNotificationBackendURL } from '../../../shared/lib/api-bridge';
+import { useRealtimeSocket } from '../../../shared/providers/RealtimeSocketProvider';
 import { jwtDecode } from 'jwt-decode';
 
 function playNotificationSound() {
@@ -28,6 +28,7 @@ export function ChiffrageProjetPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { socket } = useRealtimeSocket();
   
   const [projet, setProjet] = useState<ProjetFournisseurResponse | null>(null);
   const [articles, setArticles] = useState<any[]>([]);
@@ -51,11 +52,35 @@ export function ChiffrageProjetPage() {
   // Timeline Modal
   const [timelineModal, setTimelineModal] = useState<{ isOpen: boolean; article?: any }>({ isOpen: false });
   
+  // Library Modal
+  const [libraryModal, setLibraryModal] = useState<{ isOpen: boolean; article?: any }>({ isOpen: false });
+  const [libraryFormData, setLibraryFormData] = useState({
+    lot: '',
+    ref: '',
+    nom: '',
+    date: '',
+    prixUnitaire: '',
+    unite: '',
+    decompose: false,
+    fourniture: '',
+    accessoires: '',
+    pose: '',
+    cadence: '',
+    coefficient: ''
+  });
+
+  // Associate Modal
+  const [associateModal, setAssociateModal] = useState<{ isOpen: boolean; article?: any }>({ isOpen: false });
+  const [associateSearch, setAssociateSearch] = useState('');
+  const [associateLot, setAssociateLot] = useState('Lot 2 : Menuiseries Intérieures');
+
+  // Unpriced Warning Modal
+  const [unpricedWarningModal, setUnpricedWarningModal] = useState(false);
+  
   // Chat
   const [chatMessages, setChatMessages] = useState<{ id: string | number; from: 'fournisseur' | 'projet'; message: string; time: string; senderName?: string }[]>([]);
   const [chatDraft, setChatDraft] = useState('');
   const [chatSender, setChatSender] = useState<'fournisseur' | 'projet'>('fournisseur');
-  const [socket, setSocket] = useState<Socket | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const roomId = id ? `projet-fournisseur_${id}` : '';
 
@@ -141,13 +166,7 @@ export function ChiffrageProjetPage() {
     };
     loadHistory();
 
-    const newSocket = io(getNotificationBackendURL(), {
-      transports: ['websocket'],
-      auth: { token }
-    });
-    
-    newSocket.on('connect', () => newSocket.emit('join-room', roomId));
-    newSocket.on('chat-message', (m: any) => {
+    const handleChatMessage = (m: any) => {
       setChatMessages(prev => [...prev, {
         id: m._id || Date.now(),
         from: m.senderType === 'FOURNISSEUR' ? 'fournisseur' : 'projet',
@@ -158,11 +177,56 @@ export function ChiffrageProjetPage() {
       if (m.senderType !== 'FOURNISSEUR') {
         playNotificationSound();
       }
-    });
-    
-    setSocket(newSocket);
-    return () => { newSocket.disconnect(); };
-  }, [id, user, roomId]);
+    };
+
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const refreshProject = async () => {
+      try {
+        const refreshed = await fetchDemandeById(Number(id));
+        setProjet(refreshed);
+      } catch {
+      }
+    };
+
+    const refreshProjectWithRetry = () => {
+      void refreshProject();
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => {
+        void refreshProject();
+      }, 1200);
+    };
+
+    const handleProjectStatusUpdated = (evt: any) => {
+      const updatedProjectId = Number(evt?.projetFournisseurId);
+      if (!Number.isFinite(updatedProjectId) || updatedProjectId !== Number(id)) return;
+      refreshProjectWithRetry();
+    };
+
+    const handleNotification = (notif: any) => {
+      const metadata = notif?.metadata || {};
+      const notifProjectId = Number(metadata?.projetFournisseurId);
+      const actionUrl = String(metadata?.actionUrl || '');
+      const linkedByProjectId = Number.isFinite(notifProjectId) && notifProjectId === Number(id);
+      const linkedByPath = actionUrl.includes(`/chiffrage/${id}`);
+      if (!linkedByProjectId && !linkedByPath) {
+        return;
+      }
+      refreshProjectWithRetry();
+    };
+
+    socket?.emit('join-room', roomId);
+    socket?.on('chat-message', handleChatMessage);
+    socket?.on('project-status-updated', handleProjectStatusUpdated);
+    socket?.on('notification', handleNotification);
+
+    return () => {
+      socket?.off('chat-message', handleChatMessage);
+      socket?.off('project-status-updated', handleProjectStatusUpdated);
+      socket?.off('notification', handleNotification);
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [id, user, roomId, socket]);
 
   useEffect(() => {
     if (chatScrollRef.current) {
@@ -282,6 +346,10 @@ export function ChiffrageProjetPage() {
 
   const handleSubmitDevis = async () => {
     if (!projet || !user) return;
+    if (missingCount > 0) {
+      setUnpricedWarningModal(true);
+      return;
+    }
     try {
       await handleSave();
       await soumettreDevis(projet.id, user.nomEntreprise || 'Fournisseur');
@@ -306,15 +374,22 @@ export function ChiffrageProjetPage() {
   };
 
   const handleFileUpload = async (articleId: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
     setIsUploading(articleId);
     try {
-      const uploaded = await uploadArticleFichier(articleId, file);
+      const uploadedFiles = [] as Array<{ name: string; size: string; url: string }>;
+      for (const file of files) {
+        const uploaded = await uploadArticleFichier(articleId, file);
+        uploadedFiles.push({
+          name: uploaded.nomFichier,
+          size: `${(uploaded.taille / 1024).toFixed(0)} KB`,
+          url: uploaded.url,
+        });
+      }
       setArticles(prev => prev.map(a => {
         if (a.id === articleId) {
-          const newFiles = [...(a.files || []), { name: uploaded.nomFichier, size: `${(uploaded.taille / 1024).toFixed(0)} KB`, url: uploaded.url }];
-          return { ...a, files: newFiles };
+          return { ...a, files: [...(a.files || []), ...uploadedFiles] };
         }
         return a;
       }));
@@ -432,7 +507,7 @@ export function ChiffrageProjetPage() {
                     {isSaving ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="fi fi-rr-disk me-1"></i>} 
                     Sauvegarder
                   </button>
-                  <button className="btn btn-primary btn-sm px-4 rounded-pill shadow-sm fw-bold border-0" style={{ backgroundColor: '#316AFF' }} onClick={handleSubmitDevis} disabled={isSaving || missingCount > 0}>
+                  <button className="btn btn-primary btn-sm px-4 rounded-pill shadow-sm fw-bold border-0" style={{ backgroundColor: '#316AFF' }} onClick={handleSubmitDevis} disabled={isSaving}>
                     <i className="fi fi-rr-paper-plane me-1"></i> Envoyer le Devis
                   </button>
                 </>
@@ -489,6 +564,43 @@ export function ChiffrageProjetPage() {
 
       <div className="row g-4 mb-5">
         <div className="col-lg-9 text-start">
+          {/* ── New Horizontal Résumé Offre ── */}
+          <div className="d-flex bg-white rounded-3 shadow-sm overflow-hidden mb-4" style={{ minHeight: '80px', border: '1px solid #E8ECF4' }}>
+            <div className="d-flex align-items-center justify-content-center flex-column p-3" style={{ width: '130px', backgroundColor: '#6Cb2FF', color: 'white' }}>
+               <h5 className="mb-0 fw-bold text-center lh-sm" style={{ fontSize: '15px' }}>Résumé<br/>Offre</h5>
+            </div>
+            <div className="d-flex flex-grow-1 align-items-center justify-content-around py-2 px-3">
+              <div className="text-center">
+                 <div className="fw-extrabold text-primary mb-1" style={{ fontSize: '15px' }}>{totalHT.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</div>
+                 <div className="text-dark fw-bold small text-uppercase" style={{ fontSize: '11px' }}>Total HT (€)</div>
+              </div>
+              <div className="text-center">
+                 <div className="fw-bold text-dark mb-1" style={{ fontSize: '14px' }}>{articles.length}</div>
+                 <div className="text-muted fw-bold small text-uppercase" style={{ fontSize: '11px' }}>Articles chiffrés</div>
+              </div>
+              <div className="text-center">
+                 <div className="fw-bold text-dark mb-1" style={{ fontSize: '14px' }}>{missingCount}</div>
+                 <div className="text-muted fw-bold small text-uppercase" style={{ fontSize: '11px' }}>Restants</div>
+              </div>
+              <div className="text-center">
+                 <div className="d-flex align-items-center justify-content-center bg-light rounded-pill px-2 mb-1" style={{ width: '80px', margin: '0 auto', height: '26px' }}>
+                    <input
+                      type="number"
+                      className="form-control form-control-sm border-0 bg-transparent text-end fw-bold p-0 me-1 text-dark"
+                      value={globalTva === 0 ? '' : globalTva}
+                      min={0}
+                      max={100}
+                      style={{ fontSize: '13px' }}
+                      onChange={(e) => handleGlobalTvaChange(e.target.value)}
+                      disabled={isLocked || isNouveau}
+                    />
+                    <span className="fw-bold text-muted" style={{ fontSize: '11px' }}>%</span>
+                 </div>
+                 <div className="text-muted fw-bold small text-uppercase" style={{ fontSize: '11px' }}>TVA</div>
+              </div>
+            </div>
+          </div>
+
           <div className="card border-0 shadow-sm rounded-4 bg-white overflow-hidden">
             <div className="card-header bg-white border-bottom p-3 d-flex gap-3 align-items-center">
               <div className="flex-grow-1 position-relative">
@@ -503,20 +615,21 @@ export function ChiffrageProjetPage() {
             </div>
             <div className="table-responsive">
               <table className="table table-hover align-middle mb-0">
-                <thead className="bg-light bg-opacity-50">
-                  <tr className="small text-muted text-uppercase fw-bold">
-                    <th className="px-4 py-3" style={{ width: '120px' }}>Ref</th>
-                    <th className="py-3">Article & Specs</th>
-                    <th className="py-3 text-center">Quantité</th>
-                    <th className="py-3" style={{ width: '160px' }}>Prix Unitaire HT</th>
-                    <th className="py-3" style={{ width: '160px' }}>Remise</th>
-                    <th className="py-3" style={{ width: '160px' }}>TVA</th>
+                <thead style={{ backgroundColor: '#0978E8' }}>
+                  <tr className="small text-uppercase border-0" style={{ letterSpacing: '0.5px' }}>
+                    <th className="px-4 py-3 text-white fw-bold bg-transparent" style={{ width: '120px', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>Ref</th>
+                    <th className="py-3 text-white fw-bold bg-transparent">Article & Specs</th>
+                    <th className="py-3 text-center text-white fw-bold bg-transparent">Quantité</th>
+                    <th className="py-3 text-white fw-bold bg-transparent" style={{ width: '160px' }}>Prix Unitaire HT</th>
+                    <th className="py-3 text-white fw-bold bg-transparent" style={{ width: '160px' }}>Remise</th>
+                    <th className="py-3 text-white fw-bold bg-transparent" style={{ width: '160px' }}>TVA</th>
+                    <th className="py-3 text-white fw-bold bg-transparent" style={{ width: '220px' }}>Fichiers</th>
                     {showStatusAndActionColumns && (
-                      <th className="py-3 text-center" style={{ width: '130px' }}>Statut</th>
+                      <th className="py-3 text-center text-white fw-bold bg-transparent" style={{ width: '130px' }}>Statut</th>
                     )}
-                    <th className="px-4 py-3 text-end" style={{ width: '160px' }}>Total HT (€)</th>
+                    <th className="px-4 py-3 text-end text-white fw-bold bg-transparent" style={{ width: '160px', borderTopRightRadius: !showStatusAndActionColumns ? '8px' : '0', borderBottomRightRadius: !showStatusAndActionColumns ? '8px' : '0' }}>Total HT (€)</th>
                     {showStatusAndActionColumns && (
-                      <th className="px-4 py-3 text-center" style={{ width: '130px' }}>Action</th>
+                      <th className="px-4 py-3 text-center text-white fw-bold bg-transparent" style={{ width: '130px', borderTopRightRadius: '8px', borderBottomRightRadius: '8px' }}>Action</th>
                     )}
                   </tr>
                 </thead>
@@ -574,6 +687,33 @@ export function ChiffrageProjetPage() {
                             </span>
                           </div>
                         </td>
+                        <td>
+                          <div className="space-y-2">
+                            <div className="d-flex flex-wrap gap-2 align-items-center">
+                              {(a.files || []).length > 0 ? (
+                                (a.files || []).map((f: any, idx: number) => (
+                                  <a
+                                    key={`${a.id}-file-${idx}`}
+                                    href={f.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="badge bg-primary-subtle text-primary border border-primary-subtle text-decoration-none"
+                                  >
+                                    {f.name}
+                                  </a>
+                                ))
+                              ) : (
+                                <span className="text-muted small">Aucun fichier</span>
+                              )}
+                            </div>
+                            {!isLocked && !isNouveau && (
+                              <label className="btn btn-sm btn-outline-primary rounded-pill px-3 mb-0">
+                                Ajouter fichiers
+                                <input type="file" className="d-none" onChange={(e) => handleFileUpload(a.id, e)} disabled={isUploading === a.id || isLocked || isNouveau} multiple />
+                              </label>
+                            )}
+                          </div>
+                        </td>
                         {showStatusAndActionColumns && (
                           <td className="text-center">
                             {(a.statusInterne === 'en_attente_chiffrage' || a.statusInterne === 'Non chiffré' || a.statusInterne === 'Non chiffre' || a.price === '') && (
@@ -614,15 +754,36 @@ export function ChiffrageProjetPage() {
                                 <button
                                   type="button"
                                   className="btn btn-sm p-0 border-0 bg-transparent text-primary"
-                                  title="Voir le document"
+                                  title="Ajouter à la bibliothèque"
                                   disabled={isLocked}
                                   onClick={() => {
-                                    if (a.files && a.files[0]?.url) {
-                                      window.open(a.files[0].url, '_blank', 'noopener,noreferrer');
-                                    }
+                                    setLibraryModal({ isOpen: true, article: a });
+                                    setLibraryFormData({
+                                      lot: projet.lots?.find(l => l.articles?.some(ar => ar.id === a.id))?.nomProjetLot || '',
+                                      ref: a.code,
+                                      nom: a.label,
+                                      date: new Date().toISOString().split('T')[0],
+                                      prixUnitaire: a.price ? String(a.price) : '',
+                                      unite: a.unit || 'U',
+                                      decompose: false,
+                                      fourniture: '',
+                                      accessoires: '',
+                                      pose: '',
+                                      cadence: '',
+                                      coefficient: ''
+                                    });
                                   }}
                                 >
-                                  <i className="fi fi-rr-link" />
+                                  <i className="fi fi-rr-book-alt" />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm p-0 border-0 bg-transparent text-secondary"
+                                  title="Associer à un article existant"
+                                  disabled={isLocked}
+                                  onClick={() => setAssociateModal({ isOpen: true, article: a })}
+                                >
+                                  <i className="fi fi-rr-link-alt" />
                                 </button>
                                 <button
                                   type="button"
@@ -685,7 +846,7 @@ export function ChiffrageProjetPage() {
                                     <label className={`btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm ${isUploading === a.id ? 'disabled' : ''}`}>
                                       {isUploading === a.id ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="fi fi-rr-upload me-1"></i>}
                                       Joindre un document (Devis/Plan)
-                                      <input type="file" className="d-none" onChange={(e) => handleFileUpload(a.id, e)} disabled={isUploading === a.id || isLocked || isNouveau} />
+                                      <input type="file" className="d-none" onChange={(e) => handleFileUpload(a.id, e)} disabled={isUploading === a.id || isLocked || isNouveau} multiple />
                                     </label>
                                   </div>
                                 </div>
@@ -703,82 +864,20 @@ export function ChiffrageProjetPage() {
         </div>
 
         <div className="col-lg-3">
-          <div
-            className="card border-0 shadow-sm rounded-4 bg-white offer-summary-sticky"
-          >
-            <div className="card-header bg-transparent border-bottom p-4">
-              <h5 className="fw-extrabold mb-0 text-dark">Résumé Offre</h5>
-            </div>
-            <div className="card-body p-4 text-start">
-              <div className="text-center mb-4 p-4 bg-primary bg-opacity-10 rounded-4">
-                <small className="text-primary fw-bold d-block mb-1" style={{ fontSize: '10px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>TOTAL HT</small>
-                <h2 className="fw-extrabold text-primary mb-0">{totalHT.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</h2>
-              </div>
-              <div className="vstack gap-3 mb-4">
-                <div className="d-flex justify-content-between"><span className="text-muted small">Articles à chiffrer</span><span className="fw-bold">{articles.length}</span></div>
-                <div className="d-flex justify-content-between align-items-center">
-                  <span className="text-muted small">Restants</span>
-                  <span className={`badge rounded-pill ${missingCount > 0 ? 'bg-warning text-dark' : 'bg-success text-white'} fw-bold`}>{missingCount} articles</span>
-                </div>
-                <div className="d-flex justify-content-between align-items-center gap-2">
-                  <span className="text-muted small">TVA (%)</span>
-                  <div className="position-relative" style={{ width: '112px' }}>
-                    <input
-                      type="number"
-                      className="form-control form-control-sm text-end fw-bold pe-4 rounded-3 pricing-input"
-                      value={globalTva === 0 ? '' : globalTva}
-                      min={0}
-                      max={100}
-                      onChange={(e) => handleGlobalTvaChange(e.target.value)}
-                      disabled={isLocked || isNouveau}
-                    />
-                    <span className="position-absolute end-0 top-50 translate-middle-y me-2 text-muted" style={{ fontSize: '0.75rem' }}>%</span>
-                  </div>
-                </div>
-                <hr className="my-1 border-light" />
-                <div className="d-flex justify-content-between"><span className="text-muted small">TVA totale</span><span className="fw-bold">{totalTVA.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span></div>
-                <div className="d-flex justify-content-between"><span className="text-muted small">Total TTC</span><span className="fw-bold text-dark">{totalTTC.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span></div>
-              </div>
-              <div className="mb-4">
-                <div className="d-flex justify-content-between align-items-center mb-1">
-                  <small className="text-muted fw-bold">PROGRESSION</small>
-                  <small className="fw-extrabold text-primary">{completionRate}%</small>
-                </div>
-                <div className="progress" style={{ height: '8px', borderRadius: '4px' }}>
-                  <div className="progress-bar bg-primary progress-bar-striped progress-bar-animated" style={{ width: `${completionRate}%` }}></div>
-                </div>
-              </div>
-              <div className="p-3 bg-light rounded-3 border">
-                <h6 className="small fw-extrabold text-dark mb-2" style={{ textTransform: 'uppercase' }}>Notes Client</h6>
-                <p className="text-muted small mb-0 lh-sm">"Merci de privilégier les matériaux de marques NF. Livraison attendue sur site."</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Chat interne entre l'équipe fournisseur et l'équipe projet ── */}
-      {showChat ? (
-      <div className="row g-4 mb-5">
-        <div className="col-12">
-          <div className="card border-0 shadow-sm rounded-4 bg-white">
-            <div className="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
-              <div>
-                <h5 className="fw-extrabold mb-1 text-dark">Espace d’échange interne</h5>
-                <p className="text-muted small mb-0">
-                  Discussion entre <strong>l’équipe Fournisseur</strong> et <strong>l’équipe Projet</strong> pour le dossier #{id}.
-                </p>
-              </div>
-              <span className="badge bg-primary-subtle text-primary small">
-                <i className="fi fi-rr-comments me-1" /> Chat interne
+          {showChat ? (
+          <div className="card border-0 shadow-sm rounded-4 bg-white sticky-top" style={{ top: '80px', border: '1px solid #E8ECF4' }}>
+            <div className="card-header border-bottom bg-white d-flex justify-content-between align-items-center py-3 px-3" style={{ borderRadius: '16px 16px 0 0' }}>
+              <h6 className="fw-extrabold mb-0 text-dark" style={{ fontSize: '14px' }}>Espace d'échange</h6>
+              <span className="d-flex align-items-center justify-content-center" style={{ width: '28px', height: '28px', borderRadius: '6px', backgroundColor: '#F3F6FC', border: '1px solid #D9E4FA' }}>
+                <i className="fi fi-rr-comments text-primary" style={{ fontSize: '12px' }} />
               </span>
             </div>
             {!chatWritable && (
-              <div className="mx-3 mt-2 alert alert-warning py-2 small mb-0">
-                Discussion en lecture seule: ce projet est {projet?.status || 'fermé'}.
+              <div className="mx-3 mt-3 py-2 text-center" style={{ backgroundColor: '#FFF4E5', color: '#D2752B', fontSize: '11px', borderRadius: '8px', borderLeft: '3px solid #F59E0B', fontWeight: '600' }}>
+                Lecture seule (termine).
               </div>
             )}
-            <div className="card-body border-top pt-3" style={{ maxHeight: 320, overflowY: 'auto' }}>
+            <div className="card-body border-top-0 pt-3 px-3" style={{ height: '380px', overflowY: 'auto' }}>
               <div className="vstack gap-3">
                 {chatMessages.map((m) => (
                   <div
@@ -786,66 +885,47 @@ export function ChiffrageProjetPage() {
                     className={`d-flex ${m.from === 'fournisseur' ? 'justify-content-end' : 'justify-content-start'}`}
                   >
                     {m.from === 'projet' && (
-                      <div className="me-2">
-                        <div className="avatar avatar-xs rounded-circle bg-info text-white d-flex align-items-center justify-content-center">
-                          <i className="fi fi-rr-briefcase"></i>
+                      <div className="d-flex flex-column align-items-start">
+                        <div className="bg-light text-dark p-2 px-3 shadow-sm border border-light" style={{ borderRadius: '12px 12px 12px 2px', backgroundColor: '#F8FAFC', minWidth: '150px' }}>
+                          <div className="d-flex gap-2 align-items-center mb-1">
+                            <span className="fw-bold text-dark" style={{ fontSize: '10.5px' }}>{m.senderName ? m.senderName : "Admin Hayder"}</span>
+                            <span className="text-muted" style={{ fontSize: '9.5px' }}>{m.time}</span>
+                          </div>
+                          <div className="lh-sm text-dark mt-1" style={{ wordBreak: 'break-word', fontWeight: '500', fontSize: '12px' }}>{m.message}</div>
                         </div>
                       </div>
                     )}
-                    <div
-                      className={`p-3 rounded-4 shadow-sm small ${
-                        m.from === 'fournisseur'
-                          ? 'bg-primary text-white'
-                          : 'bg-light text-dark'
-                      }`}
-                      style={{ maxWidth: '75%' }}
-                    >
-                      <div className="d-flex justify-content-between align-items-center mb-1">
-                        <span className="fw-bold">
-                          {m.senderName ? m.senderName : (m.from === 'fournisseur' ? "Équipe Fournisseur" : "Équipe Projet")}
-                        </span>
-                        <span className={`ms-2 text-2xs ${m.from === 'fournisseur' ? 'text-white-50' : 'text-muted'}`}>
-                          {m.time}
-                        </span>
-                      </div>
-                      <div className="mb-0">{m.message}</div>
-                    </div>
+
                     {m.from === 'fournisseur' && (
-                      <div className="ms-2">
-                        <div className="avatar avatar-xs rounded-circle bg-success text-white d-flex align-items-center justify-content-center">
-                          <i className="fi fi-rr-users"></i>
+                      <div className="d-flex flex-column align-items-end">
+                        <div className="text-white p-2 px-3 shadow-sm border-0" style={{ borderRadius: '12px 12px 2px 12px', backgroundColor: '#5D8BFF', minWidth: '150px', transform: 'translateX(5px)' }}>
+                          <div className="d-flex gap-2 justify-content-between align-items-center mb-1">
+                            <span className="fw-bold text-white text-nowrap" style={{ fontSize: '10.5px' }}>{m.senderName ? m.senderName : "bouchniba boch"}</span>
+                            <span className="text-white-50" style={{ fontSize: '9.5px' }}>{m.time}</span>
+                          </div>
+                          <div className="lh-sm text-white mt-1" style={{ wordBreak: 'break-word', fontWeight: '600', fontSize: '12px' }}>{m.message}</div>
                         </div>
                       </div>
                     )}
                   </div>
                 ))}
                 {chatMessages.length === 0 && (
-                  <div className="text-center text-muted small py-4">
-                    <i className="fi fi-rr-comments text-primary fs-4 d-block mb-2" />
-                    Aucune conversation pour le moment. Démarrez l’échange pour ce chiffrage.
+                  <div className="text-center text-muted small py-4 mt-4">
+                    <i className="fi fi-rr-comments text-primary fs-3 d-block mb-2 opacity-50" />
+                    <span style={{ fontSize: '11px' }}>Aucun message.</span>
                   </div>
                 )}
                 <div ref={chatScrollRef} />
               </div>
             </div>
-            <div className="card-footer border-0 bg-light-subtle">
-              <div className="row g-2 align-items-center">
-                <div className="col-md-3">
-                  <select
-                    className="form-select form-select-sm rounded-3"
-                    value={chatSender}
-                    onChange={(e) => setChatSender(e.target.value as 'fournisseur' | 'projet')}
-                    disabled={!chatWritable}
-                  >
-                    <option value="fournisseur">Équipe Fournisseur</option>
-                    <option value="projet">Équipe Projet</option>
-                  </select>
-                </div>
-                <div className="col-md-7">
+            <div className="card-footer border-top bg-white p-3 pt-3" style={{ borderRadius: '0 0 16px 16px', borderTopColor: '#E8ECF4' }}>
+              <div className="d-flex flex-column gap-2 mb-1">
+                <div className="d-flex gap-2">
                   <input
                     type="text"
-                    className="form-control form-control-sm rounded-3"
-                    placeholder="Écrire un message interne lié à ce chiffrage…"
+                    className="form-control border rounded-3 py-2 shadow-none flex-grow-1"
+                    placeholder="Message..."
+                    style={{ fontSize: '13px', borderColor: '#E8ECF4', color: '#64748B' }}
                     value={chatDraft}
                     onChange={(e) => setChatDraft(e.target.value)}
                     disabled={!chatWritable}
@@ -856,31 +936,33 @@ export function ChiffrageProjetPage() {
                       }
                     }}
                   />
-                </div>
-                <div className="col-md-2 d-grid">
                   <button
                     type="button"
-                    className="btn btn-primary btn-sm rounded-3 fw-bold"
+                    className="btn btn-primary rounded-3 d-flex align-items-center justify-content-center shadow-sm"
+                    style={{ backgroundColor: '#8CB4FF', borderColor: '#8CB4FF', width: '40px', height: '38px', padding: '0' }}
                     onClick={handleSendMessage}
-                    disabled={!chatWritable}
+                    disabled={!chatWritable || !chatDraft.trim()}
                   >
-                    <i className="fi fi-rr-paper-plane me-1"></i> Envoyer
+                    <i className="fi fi-rr-paper-plane text-white" style={{ fontSize: '14px', marginTop: '3px', marginLeft: '-2px' }}></i>
                   </button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-      ) : (
-      <div className="row g-4 mb-5">
-        <div className="col-12">
-          <div className="alert alert-info mb-0">
-            Le chat sera disponible une fois le projet accepté par le fournisseur.
+          ) : (
+          <div className="alert alert-info small">
+            Le chat sera disponible une fois le projet accepté.
+          </div>
+          )}
+          
+          <div className="p-3 bg-light rounded-3 border mt-4">
+            <h6 className="small fw-extrabold text-dark mb-2" style={{ textTransform: 'uppercase', fontSize: '11px' }}>Notes Client</h6>
+            <p className="text-muted small mb-0 lh-sm" style={{ fontSize: '11px' }}>"Merci de privilégier les matériaux de marques NF. Livraison attendue sur site."</p>
           </div>
         </div>
       </div>
-      )}
+
+      {/* Ligne Chat supprimée car intégrée à droite */}
 
       {/* Article Timeline Modal */}
       {timelineModal.isOpen && timelineModal.article && (
@@ -1021,6 +1103,240 @@ export function ChiffrageProjetPage() {
                     {isSignaling ? <span className="spinner-border spinner-border-sm me-2" /> : <i className="fi fi-rr-paper-plane me-2"></i>}
                     Confirmer
                   </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Library/Catalogue Modal */}
+      {libraryModal.isOpen && (
+        <>
+          <div className="modal-backdrop fade show" style={{ zIndex: 1040, backgroundColor: 'rgba(0,0,0,0.5)' }}></div>
+          <div className="modal fade show d-block" tabIndex={-1} style={{ zIndex: 1050 }}>
+            <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '600px' }}>
+              <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden animate__animated animate__fadeIn">
+                <div className="modal-header border-bottom bg-white p-4 pb-3">
+                  <h5 className="modal-title fw-extrabold text-dark d-flex align-items-center gap-2" style={{ fontSize: '15.5px' }}>
+                    <div className="avatar avatar-xs bg-primary bg-opacity-10 text-primary rounded-1 d-flex align-items-center justify-content-center" style={{ width: '28px', height: '28px' }}>
+                      <i className="fi fi-rr-book-alt" style={{ fontSize: '14px' }}></i>
+                    </div>
+                    Ajouter un article dans la bibliothèque
+                  </h5>
+                  <button type="button" className="btn-close shadow-none" onClick={() => setLibraryModal({ isOpen: false })}></button>
+                </div>
+                <div className="modal-body p-4 bg-white" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
+                  <div className="row g-3 mb-3">
+                    <div className="col-md-6">
+                      <label className="form-label small fw-bold text-dark mb-1">Lot article <span className="text-danger">*</span></label>
+                      <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Choisir le lot" value={libraryFormData.lot} onChange={e => setLibraryFormData({...libraryFormData, lot: e.target.value})} />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label small fw-bold text-dark mb-1">REF <span className="text-danger">*</span></label>
+                      <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir la référence" value={libraryFormData.ref} onChange={e => setLibraryFormData({...libraryFormData, ref: e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label small fw-bold text-dark mb-1">Nom article <span className="text-danger">*</span></label>
+                    <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir le nom de l'article" value={libraryFormData.nom} onChange={e => setLibraryFormData({...libraryFormData, nom: e.target.value})} />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label small fw-bold text-dark mb-1">Date <span className="text-danger">*</span></label>
+                    <div className="position-relative">
+                      <input type="date" className="form-control form-control-sm border-0 shadow-none px-3 py-2 text-muted" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} value={libraryFormData.date} onChange={e => setLibraryFormData({...libraryFormData, date: e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="row g-3 mb-3">
+                    <div className="col-md-6">
+                      <label className="form-label small fw-bold text-dark mb-1">Prix unitaire <span className="text-danger">*</span></label>
+                      <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir le prix unitaire" value={libraryFormData.prixUnitaire} onChange={e => setLibraryFormData({...libraryFormData, prixUnitaire: e.target.value})} />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label small fw-bold text-dark mb-1">Unité <span className="text-danger">*</span></label>
+                      <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir l'unité" value={libraryFormData.unite} onChange={e => setLibraryFormData({...libraryFormData, unite: e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <label className="form-label small fw-bold text-dark mb-2">Document</label>
+                    <div>
+                      <button className="btn btn-sm text-primary border-0 rounded-3 px-3 py-2 d-inline-flex align-items-center gap-2 fw-bold" style={{ backgroundColor: '#F3F6FC', fontSize: '12px' }}>
+                        <i className="fi fi-rr-upload fs-6"></i> Importer un document
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="form-check mb-3 d-flex align-items-center gap-2 custom-check">
+                    <input className="form-check-input mt-0 shadow-none" type="checkbox" id="decomposeCheck" checked={libraryFormData.decompose} onChange={e => setLibraryFormData({...libraryFormData, decompose: e.target.checked})} style={{ width: '16px', height: '16px' }} />
+                    <label className="form-check-label text-muted fw-medium" htmlFor="decomposeCheck" style={{ fontSize: '13px' }}>
+                      Je souhaite décomposer le prix
+                    </label>
+                  </div>
+
+                  {libraryFormData.decompose && (
+                    <div className="animate__animated animate__fadeIn">
+                      <div className="row g-3 mb-3">
+                        <div className="col-md-4">
+                          <label className="form-label small fw-bold text-dark mb-1">Fourniture (€)</label>
+                          <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir le montant" value={libraryFormData.fourniture} onChange={e => setLibraryFormData({...libraryFormData, fourniture: e.target.value})} />
+                        </div>
+                        <div className="col-md-4">
+                          <label className="form-label small fw-bold text-dark mb-1">Accessoires (€)</label>
+                          <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir le montant" value={libraryFormData.accessoires} onChange={e => setLibraryFormData({...libraryFormData, accessoires: e.target.value})} />
+                        </div>
+                        <div className="col-md-4">
+                          <label className="form-label small fw-bold text-dark mb-1">Pose (€)</label>
+                          <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir le montant" value={libraryFormData.pose} onChange={e => setLibraryFormData({...libraryFormData, pose: e.target.value})} />
+                        </div>
+                      </div>
+                      <div className="row g-3 mb-3">
+                        <div className="col-md-6">
+                          <label className="form-label small fw-bold text-dark mb-1">Cadence en heure</label>
+                          <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir la cadence" value={libraryFormData.cadence} onChange={e => setLibraryFormData({...libraryFormData, cadence: e.target.value})} />
+                        </div>
+                        <div className="col-md-6">
+                          <label className="form-label small fw-bold text-dark mb-1">Coefficient de vente</label>
+                          <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir le coefficient" value={libraryFormData.coefficient} onChange={e => setLibraryFormData({...libraryFormData, coefficient: e.target.value})} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="modal-footer border-top-0 d-flex justify-content-center p-4 pt-3 pb-4 space-x-3 gap-3">
+                  <button type="button" className="btn bg-white border border-primary text-primary rounded-pill px-5 py-2 fw-bold shadow-sm hover:bg-light transition-all" style={{ minWidth: '140px', fontSize: '13px' }} onClick={() => setLibraryModal({ isOpen: false })}>Annuler</button>
+                  <button type="button" className="btn btn-primary rounded-pill px-5 py-2 fw-bold shadow-sm transition-all" style={{ minWidth: '140px', backgroundColor: '#6Cb2FF', borderColor: '#6Cb2FF', fontSize: '13px' }} onClick={() => {
+                    alert('Article sauvegardé dans la bibliothèque !');
+                    setLibraryModal({ isOpen: false });
+                  }}>Confirmer</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Associate Modal */}
+      {associateModal.isOpen && (
+        <>
+          <div className="modal-backdrop fade show" style={{ zIndex: 1040, backgroundColor: 'rgba(0,0,0,0.5)' }}></div>
+          <div className="modal fade show d-block" tabIndex={-1} style={{ zIndex: 1050 }}>
+            <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '950px' }}>
+              <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden animate__animated animate__fadeIn">
+                <div className="modal-body p-4 p-md-5 bg-white">
+                  <h5 className="fw-extrabold text-dark d-flex align-items-center gap-2 mb-4" style={{ fontSize: '18px' }}>
+                    <div className="avatar avatar-xs bg-primary bg-opacity-10 text-primary rounded-1 d-flex align-items-center justify-content-center" style={{ width: '28px', height: '28px' }}>
+                      <i className="fi fi-rr-link-alt" style={{ fontSize: '14px' }}></i>
+                    </div>
+                    Associer à un article existant
+                  </h5>
+                  
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <div className="d-flex gap-3 flex-grow-1" style={{ maxWidth: '650px' }}>
+                      <div className="position-relative flex-grow-1" style={{ maxWidth: '300px' }}>
+                        <i className="fi fi-rr-search position-absolute top-50 translate-middle-y text-primary" style={{ left: '16px' }}></i>
+                        <input type="text" className="form-control form-control-sm border ps-5 py-2 shadow-none rounded-pill" placeholder="Rechercher" value={associateSearch} onChange={e => setAssociateSearch(e.target.value)} />
+                      </div>
+                      <select className="form-select form-select-sm border-0 py-2 shadow-none rounded-pill" style={{ maxWidth: '280px', backgroundColor: '#F8FAFC' }} value={associateLot} onChange={e => setAssociateLot(e.target.value)}>
+                        <option value="Lot 2 : Menuiseries Intérieures">Lot 2 : Menuiseries Intérieures</option>
+                        <option value="Serrurerie metallerie">Serrurerie metallerie</option>
+                        <option value="Etanchéité">Etanchéité</option>
+                        <option value="Couverture">Couverture</option>
+                        <option value="CVC Plomberie">CVC Plomberie</option>
+                      </select>
+                    </div>
+                    <div className="d-flex gap-3">
+                       <button type="button" className="btn bg-white border border-primary text-primary rounded-pill px-4 py-2 fw-bold shadow-sm hover:bg-light" style={{ fontSize: '13px', minWidth: '110px' }} onClick={() => setAssociateModal({ isOpen: false })}>Annuler</button>
+                       <button type="button" className="btn btn-primary rounded-pill px-4 py-2 fw-bold shadow-sm" style={{ backgroundColor: '#6Cb2FF', borderColor: '#6Cb2FF', fontSize: '13px', minWidth: '110px' }} onClick={() => setAssociateModal({ isOpen: false })}>Terminer</button>
+                    </div>
+                  </div>
+
+                  <div className="table-responsive mb-4">
+                    <table className="table table-borderless align-middle mb-0" style={{ borderCollapse: 'separate', borderSpacing: '0' }}>
+                      <thead style={{ backgroundColor: '#0978E8' }}>
+                        <tr className="small text-uppercase border-0" style={{ letterSpacing: '0.5px' }}>
+                          <th className="text-white fw-bold py-3 px-4 bg-transparent" style={{ fontSize: '12px', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>LOT</th>
+                          <th className="text-white fw-bold py-3 bg-transparent" style={{ fontSize: '12px' }}>REF / Nom article</th>
+                          <th className="text-white fw-bold py-3 text-center bg-transparent" style={{ fontSize: '12px' }}>Unité</th>
+                          <th className="text-white fw-bold py-3 text-center bg-transparent" style={{ fontSize: '12px' }}>PU</th>
+                          <th className="text-white fw-bold py-3 text-center bg-transparent" style={{ fontSize: '12px' }}>Dernière mise a jour</th>
+                          <th className="text-white fw-bold py-3 text-center bg-transparent" style={{ fontSize: '12px', borderTopRightRadius: '8px', borderBottomRightRadius: '8px' }}>Associer</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr style={{ height: '12px' }}></tr>
+                        {[
+                          { lot: 'Menuiseries Intérieures', name: 'Bloc porte bois Renobloc', ref: 'MT - 001', unit: 'u', pu: '259.00', date: '15 / 04 / 2026' },
+                          { lot: 'Serrurerie metallerie', name: 'Autoportant droit et incliné', ref: 'MT - 001', unit: 'ml', pu: '53.44', date: '15 / 04 / 2026' },
+                          { lot: 'Etanchéité', name: 'Isolation en polyuréthanne 80 R3.45', ref: 'MT - 001', unit: 'm²', pu: '10.50', date: '15 / 04 / 2026' },
+                          { lot: 'Couverture', name: 'Bachage provisoire durant les travaux', ref: 'MT - 001', unit: 'm²', pu: '85.65', date: '15 / 04 / 2026' },
+                          { lot: 'CVC Plomberie', name: 'Chauffe bain Gaz 150L', ref: 'MT - 001', unit: 'u', pu: '255.45', date: '15 / 04 / 2026' }
+                        ].map((item, idx) => (
+                          <React.Fragment key={idx}>
+                            <tr style={{ backgroundColor: '#F8FAFC' }}>
+                              <td className="py-3 px-4 fw-black text-dark" style={{ fontSize: '12px', width: '18%', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>
+                                <div style={{ maxWidth: '120px', lineHeight: '1.4' }}>{item.lot}</div>
+                              </td>
+                              <td className="py-3" style={{ width: '32%' }}>
+                                 <div className="fw-extrabold text-dark mb-1" style={{ fontSize: '12px' }}>{item.name}</div>
+                                 <div className="text-muted fw-bold" style={{ fontSize: '10px', textTransform: 'uppercase' }}>{item.ref}</div>
+                              </td>
+                              <td className="py-3 text-center fw-extrabold text-dark" style={{ fontSize: '12px' }}>{item.unit}</td>
+                              <td className="py-3 text-center fw-extrabold text-dark" style={{ fontSize: '12px' }}>{item.pu} €</td>
+                              <td className="py-3 text-center fw-extrabold text-dark" style={{ fontSize: '12px' }}>{item.date}</td>
+                              <td className="py-3 text-center" style={{ borderTopRightRadius: '8px', borderBottomRightRadius: '8px' }}>
+                                 <button className="btn btn-sm btn-primary rounded-pill px-4 fw-bold shadow-sm hover:opacity-90" style={{ backgroundColor: '#6Cb2FF', borderColor: '#6Cb2FF', fontSize: '11px' }}>Choisir</button>
+                              </td>
+                            </tr>
+                            <tr style={{ height: '8px', backgroundColor: 'transparent' }}></tr>
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="d-flex justify-content-center align-items-center gap-3 text-primary mt-3">
+                    <button className="btn btn-sm border-0 bg-transparent text-primary p-0 d-flex align-items-center justify-content-center" style={{ width: '24px' }}><i className="fi fi-rr-angle-left"></i></button>
+                    <span className="text-primary fw-bold cursor-pointer" style={{ fontSize: '13px' }}>1</span>
+                    <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold shadow-sm cursor-pointer" style={{ width: '32px', height: '32px', fontSize: '13px', backgroundColor: '#0084FF' }}>2</div>
+                    <span className="text-primary fw-medium" style={{ letterSpacing: '2px' }}>...</span>
+                    <span className="text-primary fw-bold cursor-pointer" style={{ fontSize: '13px' }}>9</span>
+                    <button className="btn btn-sm border-0 bg-transparent text-primary p-0 d-flex align-items-center justify-content-center" style={{ width: '24px' }}><i className="fi fi-rr-angle-right"></i></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Unpriced Warning Modal */}
+      {unpricedWarningModal && (
+        <>
+          <div className="modal-backdrop fade show" style={{ zIndex: 1040, backgroundColor: 'rgba(0,0,0,0.2)' }}></div>
+          <div className="modal fade show d-block" tabIndex={-1} style={{ zIndex: 1050 }}>
+            <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '400px' }}>
+              <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden animate__animated animate__zoomIn animate__faster">
+                <div className="modal-body p-4 p-md-4 text-center bg-white rounded-4">
+                  <div className="d-flex align-items-center mb-4">
+                     <i className="fi fi-rr-calendar-xmark text-danger me-3" style={{ fontSize: '20px' }}></i>
+                     <h5 className="fw-black text-dark mb-0" style={{ fontSize: '16px' }}>Articles non chiffrés détectés</h5>
+                  </div>
+                  <div className="fw-extrabold text-start text-dark mb-3" style={{ fontSize: '13px' }}>
+                    Certains articles n'ont pas encore été chiffrés.
+                  </div>
+                  <p className="text-muted text-start mb-4" style={{ fontSize: '12.5px', lineHeight: '1.6' }}>
+                    Veuillez compléter les informations manquantes ou signaler les articles que vous ne pouvez pas traiter avant d'envoyer le devis.
+                  </p>
+                  <div className="text-center pb-2">
+                    <button 
+                      type="button" 
+                      className="btn btn-primary rounded-pill px-5 py-2 fw-bold shadow-sm" 
+                      style={{ backgroundColor: '#6Cb2FF', borderColor: '#6Cb2FF', fontSize: '14px', minWidth: '150px' }} 
+                      onClick={() => setUnpricedWarningModal(false)}
+                    >
+                      Compris
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

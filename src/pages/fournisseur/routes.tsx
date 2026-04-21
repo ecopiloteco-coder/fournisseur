@@ -5,9 +5,10 @@ import { FournisseurDashboard } from '../../features/dashboard/ui/FournisseurDas
 import { DemandesChiffragePage } from '../../features/chiffrage/ui/DemandesChiffragePage';
 import { ChiffrageProjetPage } from '../../features/chiffrage/ui/ChiffrageProjetPage';
 import { DevisEnvoyesPage } from '../../features/chiffrage/ui/DevisEnvoyesPage';
-import { CatalogueArticlesPage } from '../../features/catalogue/ui/CatalogueArticlesPage';
+import CatalogueArticles from '../../features/btp/CatalogueArticles';
 import { HistoriquePrixPage } from '../../features/catalogue/ui/HistoriquePrixPage';
 import { EquipePage } from '../../features/equipe/ui/EquipePage';
+import { MesClientsPage } from '../../features/clients/MesClientsPage';
 
 // Pages utilitaires de l'UI d'origine
 import TaskManagement from '../../features/task-management/TaskManagement';
@@ -25,8 +26,9 @@ export const FournisseurRoutes = () => {
       <Route path="/chiffrage/demandes" element={<DemandesChiffragePage />} />
       <Route path="/chiffrage/:id" element={<ChiffrageProjetPage />} />
       <Route path="/chiffrage/devis" element={<DevisEnvoyesPage />} />
-      <Route path="/catalogue/articles" element={<CatalogueArticlesPage />} />
+      <Route path="/catalogue/articles" element={<CatalogueArticles />} />
       <Route path="/catalogue/historique" element={<HistoriquePrixPage />} />
+      <Route path="/clients" element={<MesClientsPage />} />
       <Route path="/equipe" element={<EquipePage />} />
 
       {/* Outils & pages annexes (même design que le template) */}

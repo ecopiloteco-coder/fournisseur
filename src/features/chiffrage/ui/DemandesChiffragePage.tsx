@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../shared/providers/AuthContext';
+import { useRealtimeSocket } from '../../../shared/providers/RealtimeSocketProvider';
 import { fetchDemandesParEntreprise, updateProjetStatus } from '../api/chiffrage.api';
 import { toast } from 'sonner';
 
@@ -13,6 +14,7 @@ const COLUMNS = [
 
 export function DemandesChiffragePage() {
   const { user } = useAuth();
+  const { socket } = useRealtimeSocket();
   const [projects, setProjects] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,45 +25,74 @@ export function DemandesChiffragePage() {
   const [signalMessage, setSignalMessage] = useState('');
   const [signalType, setSignalType] = useState('retard_livraison');
 
+  const mapDemandes = useCallback((data: any[]) => data.map(d => ({
+    id: d.id,
+    displayId: `PRJ-${d.projetId}`,
+    cardRef: `MT - ${String(d.projetId || d.id || 0).padStart(3, '0')}`,
+    name: d.nomProjet,
+    creatorName: d.creeParNom || d.createdByName || d.creatorName || d.creePar || 'Inconnu',
+    owner: (d as any).contactName || (d as any).nomContact || (d as any).responsable || 'Noah Yannick',
+    lot: 'Lots de consultation',
+    date: d.deadline ? new Date(d.deadline).toLocaleDateString('fr-FR') : 'Non définie',
+    status: d.status === 'en_attente' ? 'Nouveau' : d.status === 'en_cours' ? 'En cours' : d.status === 'termine' ? 'Terminé' : (d.status === 'archive' ? 'Archivé' : 'Soumis'),
+    budget: d.prixTotal && d.prixTotal > 0 ? `${Number(d.prixTotal).toLocaleString('fr-FR')} €` : 'À chiffrer',
+    articles: 0,
+    isLate: d.deadline ? new Date(d.deadline) < new Date() && d.status !== 'termine' : false
+  })), []);
+
+  const loadDemandes = useCallback(async () => {
+    if (!user || (!user.keycloakId && !user.entrepriseId)) {
+      console.warn('[Demandes] No user or entrepriseId/keycloakId:', { user });
+      setIsLoading(false);
+      return;
+    }
+    try {
+      setIsLoading(true);
+      const userId = user.keycloakId || String(user.entrepriseId);
+      const data = await fetchDemandesParEntreprise(userId);
+      setProjects(mapDemandes(data));
+    } catch (err: any) {
+      console.error('[Demandes] Error loading projects:', err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, mapDemandes]);
+
   useEffect(() => {
-    const loadDemandes = async () => {
-      if (!user || (!user.keycloakId && !user.entrepriseId)) {
-        console.warn('[Demandes] No user or entrepriseId/keycloakId:', { user });
-        setIsLoading(false);
-        return;
-      }
-      try {
-        setIsLoading(true);
-        const userId = user.keycloakId || String(user.entrepriseId);
-        console.log('[Demandes] Loading projects for user:', userId);
-        
-        const data = await fetchDemandesParEntreprise(userId);
-        console.log('[Demandes] Received projects:', data);
-        
-        const mapped = data.map(d => ({
-          id: d.id,
-          displayId: `PRJ-${d.projetId}`,
-          cardRef: `MT - ${String(d.projetId || d.id || 0).padStart(3, '0')}`,
-          name: d.nomProjet,
-          owner: (d as any).contactName || (d as any).nomContact || (d as any).responsable || 'Noah Yannick',
-          lot: 'Lots de consultation', // Simplified for list view
-          date: d.deadline ? new Date(d.deadline).toLocaleDateString('fr-FR') : 'Non définie',
-          status: d.status === 'en_attente' ? 'Nouveau' : d.status === 'en_cours' ? 'En cours' : d.status === 'termine' ? 'Terminé' : (d.status === 'archive' ? 'Archivé' : 'Soumis'),
-          budget: d.prixTotal && d.prixTotal > 0 ? `${Number(d.prixTotal).toLocaleString('fr-FR')} €` : 'À chiffrer',
-          articles: 0, // Placeholder
-          isLate: d.deadline ? new Date(d.deadline) < new Date() && d.status !== 'termine' : false
-        }));
-        console.log('[Demandes] Mapped projects:', mapped);
-        setProjects(mapped);
-      } catch (err: any) {
-        console.error('[Demandes] Error loading projects:', err);
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
+    void loadDemandes();
+  }, [loadDemandes]);
+
+  useEffect(() => {
+    if (!socket) return;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const refreshWithRetry = () => {
+      void loadDemandes();
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => {
+        void loadDemandes();
+      }, 1200);
+    };
+    const handleProjectStatusUpdated = () => {
+      refreshWithRetry();
+    };
+    const handleNotification = (notif: any) => {
+      const metadata = notif?.metadata || {};
+      const hasProjectHint = Boolean(
+        metadata?.projetFournisseurId || metadata?.interneProjetId || metadata?.actionUrl
+      );
+      if (hasProjectHint) {
+        refreshWithRetry();
       }
     };
-    loadDemandes();
-  }, [user]);
+    socket.on('project-status-updated', handleProjectStatusUpdated);
+    socket.on('notification', handleNotification);
+    return () => {
+      socket.off('project-status-updated', handleProjectStatusUpdated);
+      socket.off('notification', handleNotification);
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [socket, loadDemandes]);
 
   const filtered = projects.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -95,23 +126,7 @@ export function DemandesChiffragePage() {
       setIsLoading(true);
       await updateProjetStatus(p.id, { status: 'en_cours' });
       toast.success('Demande acceptée avec succès !');
-      // Refresh list
-      const userId = user.keycloakId || String(user.entrepriseId);
-      const data = await fetchDemandesParEntreprise(userId);
-      const mapped = data.map(d => ({
-        id: d.id,
-        displayId: `PRJ-${d.projetId}`,
-        cardRef: `MT - ${String(d.projetId || d.id || 0).padStart(3, '0')}`,
-        name: d.nomProjet,
-        owner: (d as any).contactName || (d as any).nomContact || (d as any).responsable || 'Noah Yannick',
-        lot: 'Lots de consultation',
-        date: d.deadline ? new Date(d.deadline).toLocaleDateString('fr-FR') : 'Non définie',
-        status: d.status === 'en_attente' ? 'Nouveau' : d.status === 'en_cours' ? 'En cours' : d.status === 'termine' ? 'Terminé' : (d.status === 'archive' ? 'Archivé' : 'Soumis'),
-        budget: d.prixTotal && d.prixTotal > 0 ? `${Number(d.prixTotal).toLocaleString('fr-FR')} €` : 'À chiffrer',
-        articles: 0,
-        isLate: d.deadline ? new Date(d.deadline) < new Date() && d.status !== 'termine' : false
-      }));
-      setProjects(mapped);
+      await loadDemandes();
     } catch (err: any) {
       toast.error('Erreur lors de l\'acceptation : ' + err.message);
     } finally {
@@ -184,6 +199,9 @@ export function DemandesChiffragePage() {
                           </h6>
                           <div className="d-flex flex-column gap-2 mb-3 text-start" style={{ fontSize: '12px' }}>
                             <span className="text-muted d-flex align-items-center gap-2">
+                              <i className="fi fi-rr-id-badge text-primary"></i> {p.creatorName}
+                            </span>
+                            <span className="text-muted d-flex align-items-center gap-2">
                               <i className="fi fi-rr-user text-primary"></i> {p.owner}
                             </span>
                             <span className="text-muted d-flex align-items-center gap-2">
@@ -225,14 +243,15 @@ export function DemandesChiffragePage() {
         <div className="card border-0 shadow-sm overflow-hidden">
           <div className="table-responsive text-start">
             <table className="table table-hover align-middle mb-0">
-              <thead className="bg-light">
-                <tr className="small text-muted text-uppercase">
-                  <th className="px-4 py-3">Projet & Lot</th>
-                  <th className="py-3">Articles</th>
-                  <th className="py-3">Budget Est.</th>
-                  <th className="py-3">Échéance</th>
-                  <th className="py-3">Statut</th>
-                  <th className="px-4 py-3 text-end">Action</th>
+              <thead style={{ backgroundColor: '#0978E8' }}>
+                <tr className="small text-uppercase border-0" style={{ letterSpacing: '0.5px' }}>
+                  <th className="px-4 py-3 text-white fw-bold bg-transparent" style={{ borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>Projet & Lot</th>
+                  <th className="py-3 text-white fw-bold bg-transparent">Créé par</th>
+                  <th className="py-3 text-white fw-bold bg-transparent">Articles</th>
+                  <th className="py-3 text-white fw-bold bg-transparent">Budget Est.</th>
+                  <th className="py-3 text-white fw-bold bg-transparent">Échéance</th>
+                  <th className="py-3 text-white fw-bold bg-transparent">Statut</th>
+                  <th className="px-4 py-3 text-end text-white fw-bold bg-transparent" style={{ borderTopRightRadius: '8px', borderBottomRightRadius: '8px' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -242,6 +261,7 @@ export function DemandesChiffragePage() {
                       <div className="fw-bold text-dark">{p.name}</div>
                       <div className="small text-muted">{p.lot} • <span className="text-primary">{p.displayId}</span></div>
                     </td>
+                    <td>{p.creatorName}</td>
                     <td><span className="fw-bold">{p.articles}</span></td>
                     <td className="fw-bold text-dark">{p.budget}</td>
                     <td>
