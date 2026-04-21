@@ -1,0 +1,106 @@
+---
+- name: Ensure base directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ ecopilot_remote_root }}"
+    - "{{ ecopilot_remote_env_dir }}"
+    - "{{ ecopilot_remote_assets_dir }}"
+
+- name: Check remote .env file exists
+  ansible.builtin.stat:
+    path: "{{ ecopilot_remote_env_file }}"
+  register: ecopilot_remote_env_stat
+  when: service_use_remote_env_file | default(true)
+
+- name: Fail if remote .env file is missing
+  ansible.builtin.assert:
+    that:
+      - ecopilot_remote_env_stat.stat.exists
+    fail_msg: "Remote env file {{ ecopilot_remote_env_file }} is missing. Create it on the VPS before deploying."
+  when: service_use_remote_env_file | default(true)
+
+- name: Read remote .env file
+  ansible.builtin.slurp:
+    src: "{{ ecopilot_remote_env_file }}"
+  register: ecopilot_remote_env_raw
+  when: service_use_remote_env_file | default(true)
+
+- name: Load remote .env values into Ansible facts
+  ansible.builtin.set_fact:
+    ecopilot_env_map: "{{ ecopilot_env_map | default({}) | combine({ env_key: env_value }) }}"
+  vars:
+    env_key: "{{ item | regex_replace('^([^=]+)=.*$', '\\1') | trim }}"
+    env_value: "{{ item | regex_replace('^[^=]+=(.*)$', '\\1') | trim }}"
+  loop: "{{ (ecopilot_remote_env_raw.content | b64decode).splitlines() }}"
+  when:
+    - service_use_remote_env_file | default(true)
+    - item is match('^[A-Za-z_][A-Za-z0-9_]*=')
+
+- name: Copy service assets to remote server
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "{{ item.mode | default(omit) }}"
+  loop: "{{ service_copy_files | default([]) }}"
+  loop_control:
+    label: "{{ item.src }}"
+
+- name: Ensure Docker networks exist
+  community.docker.docker_network:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ service_networks | default([]) }}"
+
+- name: Ensure Docker volumes exist
+  community.docker.docker_volume:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ service_named_volumes | default([]) }}"
+
+- name: Stop and remove existing container
+  community.docker.docker_container:
+    name: "{{ service_container_name }}"
+    state: absent
+    force_kill: true
+
+- name: Login to private Docker registry
+  community.docker.docker_login:
+    registry_url: "{{ service_registry_url }}"
+    username: "{{ service_registry_username }}"
+    password: "{{ service_registry_password }}"
+    reauthorize: true
+  when:
+    - service_registry_url is defined
+    - service_registry_username is defined
+    - service_registry_password is defined
+
+- name: Remove existing local image
+  community.docker.docker_image:
+    name: "{{ service_image }}:{{ service_tag | default(docker_image_tag | default('latest')) }}"
+    state: absent
+    force_absent: true
+
+- name: Pull latest image
+  community.docker.docker_image:
+    name: "{{ service_image }}:{{ service_tag | default(docker_image_tag | default('latest')) }}"
+    source: pull
+    force_source: true
+
+- name: Run container
+  community.docker.docker_container:
+    name: "{{ service_container_name }}"
+    image: "{{ service_image }}:{{ service_tag | default(docker_image_tag | default('latest')) }}"
+    state: started
+    recreate: true
+    restart_policy: "{{ service_restart_policy | default('unless-stopped') }}"
+    published_ports: "{{ service_ports | default(omit) }}"
+    env_file: "{{ ecopilot_remote_env_file if (service_use_remote_env_file | default(true)) else omit }}"
+    env: "{{ service_env | default(omit) }}"
+    volumes: "{{ service_volumes | default(omit) }}"
+    command: "{{ service_command | default(omit) }}"
+    healthcheck: "{{ service_healthcheck | default(omit) }}"
+    networks_cli_compatible: true
+    networks: "{{ service_network_configs | default(omit) }}"

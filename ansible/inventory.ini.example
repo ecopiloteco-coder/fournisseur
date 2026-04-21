@@ -1,0 +1,2 @@
+[ecopilot_servers]
+prod ansible_host=your-server-ip ansible_user=root ansible_port=22

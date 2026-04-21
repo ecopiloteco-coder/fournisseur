@@ -1,0 +1,24 @@
+---
+- name: Deploy fournisseur frontend
+  hosts: ecopilot_servers
+  become: true
+  collections:
+    - community.docker
+
+  vars:
+    ecopilot_remote_root: /opt/ecopilot
+    ecopilot_remote_env_dir: "{{ ecopilot_remote_root }}/env"
+    ecopilot_remote_assets_dir: "{{ ecopilot_remote_root }}/assets"
+    ecopilot_remote_env_file: "{{ ecopilot_remote_env_dir }}/.env"
+    service_container_name: fournisseur-frontend
+    service_image: registry.eco-pilot.com/fournisseur
+    service_use_remote_env_file: false
+    service_ports:
+      - "3005:80"
+    service_networks:
+      - ecopilot-network
+    service_network_configs:
+      - name: ecopilot-network
+
+  tasks:
+    - ansible.builtin.include_tasks: ../tasks/deploy-container.yml
