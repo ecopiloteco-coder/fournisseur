@@ -11,6 +11,7 @@ import { NotificationProvider } from './shared/providers/NotificationProvider';
 
 // Components
 import { ErrorBoundary } from './shared/components/ErrorBoundary';
+import { Toaster } from 'sonner';
 
 
 
@@ -39,39 +40,40 @@ function App() {
         <ThemeProvider>
           <LoadingProvider>
             <HashRouter>
-                <AuthProvider>
-                  <RealtimeSocketProvider>
-                    <NotificationProvider>
+              <AuthProvider>
+                <RealtimeSocketProvider>
+                  <NotificationProvider>
+                    <Toaster position="top-right" richColors closeButton />
                     <Suspense
-                    fallback={
-                      <div className="d-flex align-items-center justify-content-center min-vh-100">
-                        <div className="spinner-border text-primary" role="status">
-                          <span className="visually-hidden">Chargement...</span>
+                      fallback={
+                        <div className="d-flex align-items-center justify-content-center min-vh-100">
+                          <div className="spinner-border text-primary" role="status">
+                            <span className="visually-hidden">Chargement...</span>
+                          </div>
                         </div>
-                      </div>
-                    }
-                  >
-                    <Routes>
-                      {/* Public Vitrine (site vitrine) */}
-                      <Route path="/" element={<VitrinePage />} />
+                      }
+                    >
+                      <Routes>
+                        {/* Public Vitrine (site vitrine) */}
+                        <Route path="/" element={<VitrinePage />} />
 
-                      {/* Public Auth Route */}
-                      <Route path="/auth" element={<Auth />} />
-                      <Route path="/fournisseur/success" element={<SuccessPage />} />
+                        {/* Public Auth Route */}
+                        <Route path="/auth" element={<Auth />} />
+                        <Route path="/fournisseur/success" element={<SuccessPage />} />
 
-                      {/* Protected Supplier Portal */}
-                      <Route element={<FournisseurLayout />}>
-                        <Route path="/*" element={<FournisseurRoutes />} />
-                      </Route>
+                        {/* Protected Supplier Portal */}
+                        <Route element={<FournisseurLayout />}>
+                          <Route path="/*" element={<FournisseurRoutes />} />
+                        </Route>
 
-                      {/* Fallback */}
-                      <Route path="*" element={<Navigate to="/auth" replace />} />
-                    </Routes>
-                  </Suspense>
-                    </NotificationProvider>
-                  </RealtimeSocketProvider>
-                </AuthProvider>
-              </HashRouter>
+                        {/* Fallback */}
+                        <Route path="*" element={<Navigate to="/auth" replace />} />
+                      </Routes>
+                    </Suspense>
+                  </NotificationProvider>
+                </RealtimeSocketProvider>
+              </AuthProvider>
+            </HashRouter>
           </LoadingProvider>
         </ThemeProvider>
       </QueryClientProvider>

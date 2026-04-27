@@ -60,7 +60,7 @@ export default function CalendarPage() {
             if (!calendarEl) return
 
             let events = []
-            const userEntreprise = user?.keycloakId || (user?.entrepriseId ? String(user.entrepriseId) : '')
+            const userEntreprise = user?.entreprisePublicId || user?.keycloakId || (user?.entrepriseId ? String(user.entrepriseId) : '')
 
             if (userEntreprise) {
                 try {

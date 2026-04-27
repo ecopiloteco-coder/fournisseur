@@ -1,0 +1,142 @@
+// ─── Constants ────────────────────────────────────────────────────────────────
+export const ITEMS_PER_PAGE = 5
+
+export const LOTS_OPTIONS = [
+  'Menuiseries Intérieures', 'Serrurerie metallerie', 'Etanchéité',
+  'Couverture', 'CVC Plomberie', 'Gros Œuvre', 'Électricité', 'Peinture',
+]
+
+export const UNITES_OPTIONS = ['u', 'ml', 'm²', 'm³', 'kg', 't', 'ens', 'ff', 'h']
+
+export const YEARS_LABELS = ['2020', '2021', '2022', '2023', '2024', '2025', '2026']
+
+// ─── Mock Articles ─────────────────────────────────────────────────────────────
+export const INITIAL_ARTICLES = [
+  {
+    id: 1,
+    lot: 'Menuiseries Intérieures',
+    ref: 'MT-001',
+    nom: 'Bloc porte bois Renobloc',
+    unite: 'u',
+    pu: 259.00,
+    lastUpdate: '15 / 04 / 2026',
+    status: 'a_jour',
+    addedBy: 'Noah Yannick',
+    fourniture: 12.69,
+    accessoires: 13.56,
+    pose: 4.63,
+    cadence: 2,
+    coefficient: 1.5,
+    annualPU: [30, 28, 25, 22, 18, 22, 48],
+    annualYear: [30, 32, 28, 26, 20, 24, 50],
+    priceHistory: [
+      { pu: 10.00, date: '12-10-2026' },
+      { pu: 6.00,  date: '12-10-2025' },
+      { pu: 4.00,  date: '12-10-2024' },
+      { pu: 5.00,  date: '12-10-2023' },
+    ],
+  },
+  {
+    id: 2,
+    lot: 'Serrurerie metallerie',
+    ref: 'MT-001',
+    nom: 'Autoportant droit et incliné',
+    unite: 'ml',
+    pu: 53.44,
+    lastUpdate: '15 / 04 / 2026',
+    status: 'chiffre',
+    addedBy: 'Noah Yannick',
+    fourniture: 8.50,
+    accessoires: 5.20,
+    pose: 3.10,
+    cadence: 3,
+    coefficient: 1.2,
+    annualPU: [20, 22, 18, 25, 30, 28, 53],
+    annualYear: [18, 20, 17, 23, 28, 26, 50],
+    priceHistory: [
+      { pu: 53.44, date: '15-04-2026' },
+      { pu: 48.00, date: '10-01-2026' },
+    ],
+  },
+  {
+    id: 3,
+    lot: 'Etanchéité',
+    ref: 'MT-001',
+    nom: 'Isolation en polyuréthanne 80 R3.45',
+    unite: 'm²',
+    pu: 10.50,
+    lastUpdate: '15 / 04 / 2026',
+    status: 'chiffre',
+    addedBy: 'Noah Yannick',
+    fourniture: 4.20,
+    accessoires: 2.10,
+    pose: 1.80,
+    cadence: 5,
+    coefficient: 1.1,
+    annualPU: [8, 9, 8.5, 9.5, 10, 10.2, 10.5],
+    annualYear: [7, 8, 7.5, 9, 9.5, 9.8, 10],
+    priceHistory: [
+      { pu: 10.50, date: '15-04-2026' },
+      { pu: 10.00, date: '01-01-2026' },
+    ],
+  },
+  {
+    id: 4,
+    lot: 'Couverture',
+    ref: 'MT-001',
+    nom: 'Bachage provisoire durant les travaux',
+    unite: 'm²',
+    pu: 85.65,
+    lastUpdate: '15 / 04 / 2026',
+    status: 'a_jour',
+    addedBy: 'Noah Yannick',
+    fourniture: 30.00,
+    accessoires: 15.00,
+    pose: 10.00,
+    cadence: 2,
+    coefficient: 1.3,
+    annualPU: [60, 65, 70, 75, 78, 82, 85],
+    annualYear: [58, 62, 68, 72, 76, 80, 83],
+    priceHistory: [
+      { pu: 85.65, date: '15-04-2026' },
+    ],
+  },
+  {
+    id: 5,
+    lot: 'CVC Plomberie',
+    ref: 'MT-001',
+    nom: 'Chauffe bain Gaz 150L',
+    unite: 'u',
+    pu: 255.45,
+    lastUpdate: '15 / 04 / 2026',
+    status: 'chiffre',
+    addedBy: 'Noah Yannick',
+    fourniture: 100.00,
+    accessoires: 50.00,
+    pose: 30.00,
+    cadence: 1,
+    coefficient: 1.4,
+    annualPU: [200, 210, 215, 220, 230, 245, 255],
+    annualYear: [198, 208, 213, 218, 228, 242, 252],
+    priceHistory: [
+      { pu: 255.45, date: '15-04-2026' },
+      { pu: 245.00, date: '01-01-2026' },
+    ],
+  },
+]
+
+// ─── Empty form state ──────────────────────────────────────────────────────────
+export const EMPTY_FORM = {
+  lot: '',
+  ref: '',
+  nom: '',
+  date: '',
+  pu: '',
+  unite: '',
+  document: null,
+  fourniture: '',
+  accessoires: '',
+  pose: '',
+  cadence: '',
+  coefficient: '',
+}

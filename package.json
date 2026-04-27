@@ -28,7 +28,8 @@
     "@radix-ui/react-separator": "^1.1.0",
     "@radix-ui/react-avatar": "^1.1.1",
     
-    "sonner": "^1.7.0"
+    "sonner": "^1.7.0",
+    "sweetalert2": "^11.10.0"
   },
   "devDependencies": {
     "@types/node": "^20.12.0",

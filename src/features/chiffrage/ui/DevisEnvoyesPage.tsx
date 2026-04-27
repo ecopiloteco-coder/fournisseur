@@ -170,7 +170,7 @@ export function DevisEnvoyesPage() {
   const [descriptionRefus, setDescriptionRefus] = useState('');
   const [processingAction, setProcessingAction] = useState(false);
 
-  const userEntreprise = user?.keycloakId || (user?.entrepriseId ? String(user.entrepriseId) : '');
+  const userEntreprise = user?.entreprisePublicId || user?.keycloakId || (user?.entrepriseId ? String(user.entrepriseId) : '');
 
   const loadProjects = useCallback(async () => {
     if (!userEntreprise) {
@@ -463,7 +463,7 @@ export function DevisEnvoyesPage() {
       )}
 
       {showActionModal && selectedProject && actionType && (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 1050 }}>
+        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 9001 }}>
           <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '560px' }}>
             <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
               <div className={`modal-header border-0 px-4 py-3 ${actionType === 'accepter' ? 'bg-success-subtle' : 'bg-danger-subtle'}`}>
@@ -538,7 +538,7 @@ export function DevisEnvoyesPage() {
       )}
 
       {showFollowModal && selectedProject && (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 1050 }}>
+        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 9001 }}>
           <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '620px' }}>
             <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
               <div className="modal-header border-0 px-4 py-3 bg-primary-subtle">

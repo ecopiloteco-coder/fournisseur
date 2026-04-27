@@ -46,7 +46,15 @@ export const RealtimeSocketProvider = ({ children }: RealtimeSocketProviderProps
     });
 
     nextSocket.on('connect', () => {
+      // Join personal room
       nextSocket.emit('join', userId);
+      
+      // Also join company room if available to receive company-wide events
+      if (user?.entreprisePublicId) {
+        nextSocket.emit('join', user.entreprisePublicId);
+        console.log(`Socket joined company room: ${user.entreprisePublicId}`);
+      }
+      
       setIsConnected(true);
     });
 

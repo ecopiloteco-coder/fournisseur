@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../shared/providers/AuthContext';
-import { Building2, AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Building2, AlertCircle, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react';
 import { getBackendURL } from '../../../shared/lib/api-bridge';
 
 const LOTS_DISPONIBLES = [
@@ -90,8 +90,12 @@ export function Auth() {
   const [loginPassword, setLoginPassword] = useState('');
 
   // Inscription state
+  const [registerStep, setRegisterStep] = useState(1);
   const [nomEntreprise, setNomEntreprise] = useState('');
+  const [siteWeb, setSiteWeb] = useState('');
   const [email, setEmail] = useState('');
+  const [nom, setNom] = useState('');
+  const [prenom, setPrenom] = useState('');
   const [telephone, setTelephone] = useState('');
   const [adresse, setAdresse] = useState('');
   const [categorie, setCategorie] = useState('BTP');
@@ -102,6 +106,32 @@ export function Auth() {
     setSelectedLots(prev =>
       prev.includes(id) ? prev.filter(l => l !== id) : [...prev, id]
     );
+  };
+
+  const handleNextStep = () => {
+    setError(null);
+    if (registerStep === 1) {
+      if (!nomEntreprise || !adresse) {
+        setError('Veuillez remplir tous les champs obligatoires (Nom et Adresse).');
+        return;
+      }
+      if (selectedLots.length === 0) {
+        setError('Veuillez selectionner au moins un lot.');
+        return;
+      }
+      setRegisterStep(2);
+    } else if (registerStep === 2) {
+      if (!email) {
+        setError('Veuillez fournir un email professionnel valide.');
+        return;
+      }
+      setRegisterStep(3);
+    }
+  };
+
+  const handlePrevStep = () => {
+    setError(null);
+    setRegisterStep(prev => prev - 1);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -129,6 +159,9 @@ export function Auth() {
       setError('Veuillez selectionner au moins un lot.');
       return;
     }
+    if (registerStep !== 3) {
+        return;
+    }
 
     setIsGlobalLoading(true);
 
@@ -136,6 +169,9 @@ export function Auth() {
       const { error: signUpError } = await signUp({
         email,
         nomEntreprise,
+        siteWeb,
+        nom,
+        prenom,
         telephone,
         adresse,
         categorie,
@@ -245,6 +281,28 @@ export function Auth() {
 
           {activeTab === 'register' && (
             <form onSubmit={handleRegister}>
+              {/* Stepper Timeline */}
+              <div className="d-flex justify-content-between align-items-center mb-4 px-2 position-relative">
+                <div className="position-absolute top-50 start-0 end-0 translate-middle-y" style={{ height: '2px', backgroundColor: '#e9ecef', zIndex: 0 }}>
+                  <div style={{ height: '100%', backgroundColor: '#0d6efd', width: registerStep === 1 ? '0%' : registerStep === 2 ? '50%' : '100%', transition: 'width 0.3s ease' }}></div>
+                </div>
+                
+                {[1, 2, 3].map((step) => (
+                  <div key={step} className="position-relative d-flex flex-column align-items-center" style={{ zIndex: 1 }}>
+                    <div className={`rounded-circle d-flex align-items-center justify-content-center fw-bold ${registerStep >= step ? 'bg-primary text-white' : 'bg-light text-muted border'}`} style={{ width: '32px', height: '32px', transition: 'all 0.3s ease' }}>
+                      {registerStep > step ? <CheckCircle2 size={16} /> : step}
+                    </div>
+                    <small className={`position-absolute top-100 mt-1 text-nowrap fw-bold ${registerStep >= step ? 'text-primary' : 'text-muted'}`} style={{ fontSize: '0.7rem' }}>
+                      {step === 1 ? 'Entreprise' : step === 2 ? 'Profil' : 'Plan'}
+                    </small>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 pt-2"></div>
+
+              {registerStep === 1 && (
+                <div className="animation-fade-in">
+                  <h5 className="mb-3 fw-bold text-dark">Informations de l'entreprise</h5>
               <div className="mb-3">
                 <label className="form-label small fw-bold text-muted">Nom de l'entreprise *</label>
                 <input 
@@ -255,6 +313,17 @@ export function Auth() {
                   onChange={(e) => setNomEntreprise(e.target.value)} 
                   disabled={isGlobalLoading} 
                   required 
+                />
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold text-muted">Site Web</label>
+                <input 
+                  type="url" 
+                  className="form-control bg-light" 
+                  placeholder="https://www.entreprise.com" 
+                  value={siteWeb} 
+                  onChange={(e) => setSiteWeb(e.target.value)} 
+                  disabled={isGlobalLoading} 
                 />
               </div>
               <div className="mb-3">
@@ -284,29 +353,6 @@ export function Auth() {
                       <option value="SERVICES">Services</option>
                     </select>
                   </div>
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label small fw-bold text-muted">Téléphone</label>
-                    <input 
-                      type="tel" 
-                      className="form-control bg-light" 
-                      placeholder="+33 6 12 34 56 78" 
-                      value={telephone} 
-                      onChange={(e) => setTelephone(e.target.value)} 
-                      disabled={isGlobalLoading} 
-                    />
-                  </div>
-              </div>
-              <div className="mb-3">
-                <label className="form-label small fw-bold text-muted">Email professionnel *</label>
-                <input 
-                  type="email" 
-                  className="form-control bg-light" 
-                  placeholder="contact@entreprise.com" 
-                  value={email} 
-                  onChange={(e) => setEmail(e.target.value)} 
-                  disabled={isGlobalLoading} 
-                  required 
-                />
               </div>
               {/* ─── Lots BTP ─────────────────────────────────────────────── */}
               <div className="mb-3">
@@ -341,6 +387,93 @@ export function Auth() {
                 )}
               </div>
 
+              <button type="button" className="btn btn-primary btn-lg w-100 fw-bold mt-2" onClick={handleNextStep}>
+                Suivant
+              </button>
+            </div>
+            )}
+
+            {registerStep === 2 && (
+              <div className="animation-fade-in">
+                <h5 className="mb-3 fw-bold text-dark">Mon Profil (Administrateur)</h5>
+                
+                <div className="mb-3">
+                  <label className="form-label small fw-bold text-muted">Rôle *</label>
+                  <input 
+                    type="text" 
+                    className="form-control bg-light" 
+                    value="Administrateur Fournisseur" 
+                    disabled 
+                  />
+                  <small className="text-muted">Par défaut, le créateur du compte est l'administrateur principal.</small>
+                </div>
+
+                <div className="row">
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label small fw-bold text-muted">Nom *</label>
+                      <input 
+                        type="text" 
+                        className="form-control bg-light" 
+                        placeholder="Dupont" 
+                        value={nom} 
+                        onChange={(e) => setNom(e.target.value)} 
+                        disabled={isGlobalLoading} 
+                        required 
+                      />
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label small fw-bold text-muted">Prénom *</label>
+                      <input 
+                        type="text" 
+                        className="form-control bg-light" 
+                        placeholder="Jean" 
+                        value={prenom} 
+                        onChange={(e) => setPrenom(e.target.value)} 
+                        disabled={isGlobalLoading} 
+                        required 
+                      />
+                    </div>
+                </div>
+                
+                <div className="mb-3">
+                  <label className="form-label small fw-bold text-muted">Email professionnel *</label>
+                  <input 
+                    type="email" 
+                    className="form-control bg-light" 
+                    placeholder="contact@entreprise.com" 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)} 
+                    disabled={isGlobalLoading} 
+                    required 
+                  />
+                </div>
+                
+                <div className="mb-4">
+                  <label className="form-label small fw-bold text-muted">Téléphone (Optionnel)</label>
+                  <input 
+                    type="tel" 
+                    className="form-control bg-light" 
+                    placeholder="+33 6 12 34 56 78" 
+                    value={telephone} 
+                    onChange={(e) => setTelephone(e.target.value)} 
+                    disabled={isGlobalLoading} 
+                  />
+                </div>
+
+                <div className="d-flex gap-2 mt-2">
+                  <button type="button" className="btn btn-outline-secondary btn-lg flex-grow-1 fw-bold" onClick={handlePrevStep}>
+                    Précédent
+                  </button>
+                  <button type="button" className="btn btn-primary btn-lg flex-grow-1 fw-bold" onClick={handleNextStep}>
+                    Suivant
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {registerStep === 3 && (
+              <div className="animation-fade-in">
+                <h5 className="mb-3 fw-bold text-dark">Choix de l'abonnement</h5>
               <div className="mb-4">
                 <label className="form-label small fw-bold text-muted">Pack d'abonnement *</label>
                 <div className="d-flex gap-2">
@@ -349,12 +482,21 @@ export function Auth() {
                    <button type="button" onClick={() => setPack('premium')} className={`btn btn-sm flex-grow-1 ${pack === 'premium' ? 'btn-primary' : 'btn-outline-secondary'}`}>Premium</button>
                 </div>
               </div>
-              <button type="submit" className="btn btn-primary btn-lg w-100 fw-bold" disabled={isGlobalLoading}>
-                {isGlobalLoading ? <><Loader2 size={18} className="me-2 spinner-border spinner-border-sm" />Redirection...</> : "S'inscrire et payer"}
-              </button>
+
+              <div className="d-flex gap-2 mt-2 mb-2">
+                <button type="button" className="btn btn-outline-secondary btn-lg flex-grow-1 fw-bold" onClick={handlePrevStep} disabled={isGlobalLoading}>
+                  Précédent
+                </button>
+                <button type="submit" className="btn btn-primary btn-lg flex-grow-1 fw-bold" disabled={isGlobalLoading}>
+                  {isGlobalLoading ? <><Loader2 size={18} className="me-2 spinner-border spinner-border-sm" />Redirection...</> : "S'inscrire et payer"}
+                </button>
+              </div>
+              
               <div className="text-center mt-2">
                 <small className="text-muted">Vous recevrez vos identifiants par email après le paiement.</small>
               </div>
+            </div>
+            )}
             </form>
           )}
         </div>

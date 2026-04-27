@@ -352,7 +352,19 @@ export function ChiffrageProjetPage() {
     }
     try {
       await handleSave();
-      await soumettreDevis(projet.id, user.nomEntreprise || 'Fournisseur');
+      
+      const token = sessionStorage.getItem('fournisseur_token');
+      let realName = user.nomEntreprise || 'Fournisseur';
+      if (token) {
+        try {
+          const decoded: any = jwtDecode(token);
+          if (decoded.name) realName = decoded.name;
+          else if (decoded.given_name) realName = `${decoded.given_name} ${decoded.family_name || ''}`.trim();
+        } catch (e) {}
+      }
+      const userId = user.keycloakId || String(user.entrepriseId);
+      
+      await soumettreDevis(projet.id, user.nomEntreprise || 'Fournisseur', userId, realName);
       navigate('/chiffrage/demandes');
     } catch (err: any) {
       alert(err.message);
@@ -966,7 +978,7 @@ export function ChiffrageProjetPage() {
 
       {/* Article Timeline Modal */}
       {timelineModal.isOpen && timelineModal.article && (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 2000 }}>
+        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 9001 }}>
           <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '540px' }}>
             <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden animate__animated animate__zoomIn">
               <div className="modal-header border-bottom p-4 bg-white d-flex justify-content-between align-items-center">
@@ -1048,8 +1060,8 @@ export function ChiffrageProjetPage() {
       {/* Signal Modal */}
       {signalModal.isOpen && (
         <>
-          <div className="modal-backdrop fade show" style={{ zIndex: 1040 }}></div>
-          <div className="modal fade show d-block" tabIndex={-1} style={{ zIndex: 1050 }}>
+          <div className="modal-backdrop fade show" style={{ zIndex: 9000 }}></div>
+          <div className="modal fade show d-block" tabIndex={-1} style={{ zIndex: 9001 }}>
             <div className="modal-dialog modal-dialog-centered">
               <div className="modal-content border-0 rounded-4 shadow-lg">
                 <div className="modal-header border-bottom-0 pb-0">
@@ -1113,8 +1125,8 @@ export function ChiffrageProjetPage() {
       {/* Library/Catalogue Modal */}
       {libraryModal.isOpen && (
         <>
-          <div className="modal-backdrop fade show" style={{ zIndex: 1040, backgroundColor: 'rgba(0,0,0,0.5)' }}></div>
-          <div className="modal fade show d-block" tabIndex={-1} style={{ zIndex: 1050 }}>
+          <div className="modal-backdrop fade show" style={{ zIndex: 9000, backgroundColor: 'rgba(0,0,0,0.5)' }}></div>
+          <div className="modal fade show d-block" tabIndex={-1} style={{ zIndex: 9001 }}>
             <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '600px' }}>
               <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden animate__animated animate__fadeIn">
                 <div className="modal-header border-bottom bg-white p-4 pb-3">
@@ -1218,8 +1230,8 @@ export function ChiffrageProjetPage() {
       {/* Associate Modal */}
       {associateModal.isOpen && (
         <>
-          <div className="modal-backdrop fade show" style={{ zIndex: 1040, backgroundColor: 'rgba(0,0,0,0.5)' }}></div>
-          <div className="modal fade show d-block" tabIndex={-1} style={{ zIndex: 1050 }}>
+          <div className="modal-backdrop fade show" style={{ zIndex: 9000, backgroundColor: 'rgba(0,0,0,0.5)' }}></div>
+          <div className="modal fade show d-block" tabIndex={-1} style={{ zIndex: 9001 }}>
             <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '950px' }}>
               <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden animate__animated animate__fadeIn">
                 <div className="modal-body p-4 p-md-5 bg-white">
@@ -1312,8 +1324,8 @@ export function ChiffrageProjetPage() {
       {/* Unpriced Warning Modal */}
       {unpricedWarningModal && (
         <>
-          <div className="modal-backdrop fade show" style={{ zIndex: 1040, backgroundColor: 'rgba(0,0,0,0.2)' }}></div>
-          <div className="modal fade show d-block" tabIndex={-1} style={{ zIndex: 1050 }}>
+          <div className="modal-backdrop fade show" style={{ zIndex: 9000, backgroundColor: 'rgba(0,0,0,0.2)' }}></div>
+          <div className="modal fade show d-block" tabIndex={-1} style={{ zIndex: 9001 }}>
             <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '400px' }}>
               <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden animate__animated animate__zoomIn animate__faster">
                 <div className="modal-body p-4 p-md-4 text-center bg-white rounded-4">

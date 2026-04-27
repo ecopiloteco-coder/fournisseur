@@ -20,6 +20,7 @@ export interface FournisseurUser {
   role: 'ADMIN_FOURNISSEUR' | 'CHIFFREUR';
   abonnement?: 'STARTER' | 'PRO' | 'ENTERPRISE' | null;
   entrepriseId?: number;
+  entreprisePublicId?: string;
   keycloakId?: string;
   isActive?: boolean;
 }
@@ -35,6 +36,9 @@ interface AuthContextType {
   signUp: (data: { 
     email: string; 
     nomEntreprise: string; 
+    siteWeb?: string;
+    nom: string;
+    prenom: string;
     telephone?: string;
     adresse?: string;
     categorie?: string;
@@ -79,7 +83,8 @@ function buildUserFromResponse(userObj: any, accessToken?: string): FournisseurU
     keycloakId,
     role: userObj.role === 'CHIFFREUR' ? 'CHIFFREUR' : 'ADMIN_FOURNISSEUR',
     nomEntreprise: userObj.nomEntreprise || userObj.entreprise?.raisonSociale,
-    entrepriseId: userObj.entrepriseId || userObj.entreprise?.id,
+    entrepriseId: userObj.entrepriseId || userObj.entreprise_id || userObj.entreprise?.id,
+    entreprisePublicId: userObj.entreprisePublicId || userObj.entreprise_public_id || userObj.entreprise?.publicId,
   };
 }
 
@@ -200,6 +205,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (data: { 
     email: string; 
     nomEntreprise: string; 
+    siteWeb?: string;
+    nom: string;
+    prenom: string;
     telephone?: string;
     adresse?: string;
     categorie?: string;

@@ -49,7 +49,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
   const currentColors = colors[theme === 'dark' ? 'dark' : 'light'];
 
   // Filter notifications
-  const filteredNotifications = selectedTab === 'nonlus' 
+  const filteredNotifications = selectedTab === 'nonlus'
     ? notifications.filter(n => !n.read)
     : notifications;
 
@@ -64,22 +64,22 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
   return (
     <>
       {/* Backdrop */}
-      <div 
+      <div
         onClick={onClose}
-        className="fixed inset-0 bg-black/50 z-[1999]"
+        className="fixed inset-0 bg-black/50 z-[9998]"
       />
 
       {/* Panel */}
-      <div 
+      <div
         style={{
           backgroundColor: currentColors.card,
           color: currentColors.foreground,
           borderColor: currentColors.border
         }}
-        className="fixed right-0 top-0 bottom-0 w-[480px] z-[2000] shadow-lg flex flex-col overflow-hidden"
+        className="fixed right-0 top-0 bottom-0 w-[480px] z-[9999] shadow-lg flex flex-col overflow-hidden"
       >
         {/* Header */}
-        <div 
+        <div
           style={{
             borderBottomColor: currentColors.border,
             backgroundColor: currentColors.card
@@ -90,7 +90,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
               <Bell style={{ color: currentColors.primary }} className="w-6 h-6" />
               <h5 style={{ color: currentColors.foreground }} className="m-0 font-bold text-lg">Notifications</h5>
             </div>
-            <button 
+            <button
               onClick={onClose}
               style={{ color: currentColors.muted }}
               className="rounded-full p-2 hover:opacity-80 transition-all"
@@ -101,7 +101,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
         </div>
 
         {/* Tabs */}
-        <div 
+        <div
           style={{ borderBottomColor: currentColors.border }}
           className="flex gap-2 border-b px-6 py-4">
           <button
@@ -147,8 +147,8 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
                 {/* Nouveau Section */}
                 {groupedNotifications.nouveau.length > 0 && (
                   <div>
-                    <div 
-                      style={{ 
+                    <div
+                      style={{
                         backgroundColor: currentColors.sectionBg,
                         borderBottomColor: currentColors.border
                       }}
@@ -169,7 +169,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
                         >
                           <div className="flex gap-4 items-start">
                             {/* Avatar placeholder */}
-                            <div 
+                            <div
                               style={{
                                 backgroundColor: currentColors.border,
                                 borderColor: currentColors.border
@@ -180,7 +180,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
 
                             <div className="flex-1 min-w-0">
                               {/* Content */}
-                              <div 
+                              <div
                                 className="cursor-pointer"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -231,8 +231,8 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
                                   Archiver
                                 </button>
                                 {!notif.read && (
-                                  <div 
-                                    style={{ 
+                                  <div
+                                    style={{
                                       backgroundColor: currentColors.primary,
                                       boxShadow: `0 2px 8px ${currentColors.primary}40`
                                     }}
@@ -251,8 +251,8 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
                 {/* Ancien Section */}
                 {groupedNotifications.ancien.length > 0 && (
                   <div>
-                    <div 
-                      style={{ 
+                    <div
+                      style={{
                         backgroundColor: currentColors.sectionBg,
                         borderBottomColor: currentColors.border
                       }}
@@ -273,7 +273,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
                         >
                           <div className="flex gap-4 items-start">
                             {/* Avatar placeholder */}
-                            <div 
+                            <div
                               style={{
                                 backgroundColor: currentColors.border,
                                 borderColor: currentColors.border
@@ -284,7 +284,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
 
                             <div className="flex-1 min-w-0">
                               {/* Content */}
-                              <div 
+                              <div
                                 className="cursor-pointer"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -335,8 +335,8 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, 
                                   Archiver
                                 </button>
                                 {!notif.read && (
-                                  <div 
-                                    style={{ 
+                                  <div
+                                    style={{
                                       backgroundColor: currentColors.primary,
                                       boxShadow: `0 2px 8px ${currentColors.primary}40`
                                     }}

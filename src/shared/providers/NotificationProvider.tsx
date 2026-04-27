@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react'
+import { toast } from 'sonner';
 import { jwtDecode } from 'jwt-decode';
 import { getNotificationBackendURL } from '../lib/api-bridge';
 import { useAuth } from './AuthContext';
@@ -134,7 +135,7 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
 
     const token = sessionStorage.getItem('fournisseur_token');
-    const userId = user?.keycloakId || getKeycloakIdFromToken(token) || String(user?.entrepriseId || '');
+    const userId = user?.keycloakId || user?.entreprisePublicId || getKeycloakIdFromToken(token) || String(user?.entrepriseId || '');
     void fetch(`${getNotificationBackendURL()}/api/notifications/${id}/read`, {
       method: 'PUT',
       headers: {
@@ -147,16 +148,15 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
 
   const markAllAsRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-
     const token = sessionStorage.getItem('fournisseur_token');
-    const userId = user?.keycloakId || getKeycloakIdFromToken(token) || String(user?.entrepriseId || '');
-    void fetch(`${getNotificationBackendURL()}/api/notifications/read-all`, {
+    const ids = [user?.keycloakId, user?.entreprisePublicId].filter(Boolean).join(',');
+
+    void fetch(`${getNotificationBackendURL()}/api/notifications/read-all?userIds=${encodeURIComponent(ids)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ userId }),
     });
   }
 
@@ -165,6 +165,17 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
       const withoutDuplicate = prev.filter(n => n.id !== notification.id);
       return [notification, ...withoutDuplicate];
     });
+    
+    // Trigger sonner toast
+    const toastFn = notification.type === 'success' ? toast.success : 
+                  notification.type === 'error' ? toast.error : 
+                  notification.type === 'warning' ? toast.warning : toast.info;
+    
+    toastFn(notification.title, {
+      description: notification.desc,
+      duration: 5000,
+    });
+
     playNotificationSound();
     showBrowserNotification(notification);
   }
@@ -204,7 +215,7 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
       if (e.key === 'ecopilot_signals' && e.newValue) {
         try {
           const allSignals = JSON.parse(e.newValue)
-          const relances = allSignals.filter((s: any) => 
+          const relances = allSignals.filter((s: any) =>
             s.to === 'supplier' && !notificationsRef.current.some(n => n.id === String(s.id))
           )
           relances.forEach((s: any) => {
@@ -239,13 +250,13 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
   // Initial load + realtime socket notifications
   useEffect(() => {
     if (!user) return;
-    
-    const token = sessionStorage.getItem('fournisseur_token');
-    const userId = user.keycloakId || getKeycloakIdFromToken(token) || String(user.entrepriseId);
 
+    const token = sessionStorage.getItem('fournisseur_token');
+    const ids = [user.keycloakId, user.entreprisePublicId].filter(Boolean).join(',');
+    
     const loadNotifications = async () => {
       try {
-        const response = await fetch(`${getNotificationBackendURL()}/api/notifications?userId=${encodeURIComponent(userId)}&limit=50`, {
+        const response = await fetch(`${getNotificationBackendURL()}/api/notifications?userIds=${encodeURIComponent(ids)}&limit=200`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         const json = await response.json();

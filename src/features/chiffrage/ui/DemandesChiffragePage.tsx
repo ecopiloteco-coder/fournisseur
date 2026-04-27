@@ -41,14 +41,14 @@ export function DemandesChiffragePage() {
   })), []);
 
   const loadDemandes = useCallback(async () => {
-    if (!user || (!user.keycloakId && !user.entrepriseId)) {
+    if (!user || (!user.keycloakId && !user.entrepriseId && !user.entreprisePublicId)) {
       console.warn('[Demandes] No user or entrepriseId/keycloakId:', { user });
       setIsLoading(false);
       return;
     }
     try {
       setIsLoading(true);
-      const userId = user.keycloakId || String(user.entrepriseId);
+      const userId = user.entreprisePublicId || user.keycloakId || String(user.entrepriseId);
       const data = await fetchDemandesParEntreprise(userId);
       setProjects(mapDemandes(data));
     } catch (err: any) {
@@ -73,15 +73,21 @@ export function DemandesChiffragePage() {
         void loadDemandes();
       }, 1200);
     };
-    const handleProjectStatusUpdated = () => {
+    const handleProjectStatusUpdated = (payload: any) => {
+      console.log('[Socket] Project status updated:', payload);
       refreshWithRetry();
     };
     const handleNotification = (notif: any) => {
       const metadata = notif?.metadata || {};
+      const action = notif?.action || metadata?.action;
       const hasProjectHint = Boolean(
-        metadata?.projetFournisseurId || metadata?.interneProjetId || metadata?.actionUrl
+        metadata?.projetFournisseurId || 
+        metadata?.interneProjetId || 
+        metadata?.actionUrl ||
+        action === 'NOUVELLE_DEMANDE'
       );
       if (hasProjectHint) {
+        console.log('[Socket] Refreshing list due to project notification:', action);
         refreshWithRetry();
       }
     };
@@ -294,7 +300,7 @@ export function DemandesChiffragePage() {
       )}
 
       {showSignalModal && selectedProject && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9001 }}>
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden animate__animated animate__zoomIn">
               <div className="modal-header bg-warning bg-opacity-10 border-0 p-4">

@@ -7,6 +7,7 @@ import { ChiffrageProjetPage } from '../../features/chiffrage/ui/ChiffrageProjet
 import { DevisEnvoyesPage } from '../../features/chiffrage/ui/DevisEnvoyesPage';
 import CatalogueArticles from '../../features/btp/CatalogueArticles';
 import { HistoriquePrixPage } from '../../features/catalogue/ui/HistoriquePrixPage';
+import ModifierArticlePage from '../../features/btp/ModifierArticlePage';
 import { EquipePage } from '../../features/equipe/ui/EquipePage';
 import { MesClientsPage } from '../../features/clients/MesClientsPage';
 
@@ -15,6 +16,7 @@ import TaskManagement from '../../features/task-management/TaskManagement';
 import CalendarPage from '../../features/calendar/CalendarPage';
 import Faq from '../../features/pages/Faq';
 import Settings from '../../features/settings/Settings';
+import Pricing from '../../features/pages/Pricing';
 
 export const FournisseurRoutes = () => {
   return (
@@ -27,6 +29,7 @@ export const FournisseurRoutes = () => {
       <Route path="/chiffrage/:id" element={<ChiffrageProjetPage />} />
       <Route path="/chiffrage/devis" element={<DevisEnvoyesPage />} />
       <Route path="/catalogue/articles" element={<CatalogueArticles />} />
+      <Route path="/catalogue/articles/:id/modifier" element={<ModifierArticlePage />} />
       <Route path="/catalogue/historique" element={<HistoriquePrixPage />} />
       <Route path="/clients" element={<MesClientsPage />} />
       <Route path="/equipe" element={<EquipePage />} />
@@ -35,6 +38,7 @@ export const FournisseurRoutes = () => {
       <Route path="/task-management" element={<TaskManagement />} />
       <Route path="/calendar" element={<CalendarPage />} />
       <Route path="/pages/faq" element={<Faq />} />
+      <Route path="/pages/pricing" element={<Pricing />} />
       <Route path="/settings" element={<Settings />} />
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

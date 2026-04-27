@@ -254,7 +254,7 @@ export const MessagingPanel: React.FC<MessagingPanelProps> = ({ isOpen, onClose 
       {/* Backdrop */}
       <div 
         onClick={onClose}
-        className="fixed inset-0 bg-black/50 z-[999]"
+        className="fixed inset-0 bg-black/50 z-[9998]"
       />
 
       {/* Panel */}
@@ -264,7 +264,7 @@ export const MessagingPanel: React.FC<MessagingPanelProps> = ({ isOpen, onClose 
           color: currentColors.foreground,
           borderColor: currentColors.border
         }}
-        className="fixed right-0 top-0 bottom-0 w-[450px] z-[1000] shadow-lg flex flex-col overflow-hidden"
+        className="fixed right-0 top-0 bottom-0 w-[450px] z-[9999] shadow-lg flex flex-col overflow-hidden"
       >
         <>
           <div 
@@ -370,7 +370,7 @@ export const MessagingPanel: React.FC<MessagingPanelProps> = ({ isOpen, onClose 
       </div>
 
       {activeConversation && (
-        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/45 p-4">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/45 p-4">
           <div
             style={{
               backgroundColor: currentColors.card,

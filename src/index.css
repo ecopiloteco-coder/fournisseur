@@ -94,3 +94,8 @@
   color: inherit !important;
 }
 
+/* SweetAlert2 Global Z-Index Override */
+.swal2-container {
+  z-index: 11000 !important;
+}
+

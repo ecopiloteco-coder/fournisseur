@@ -154,12 +154,21 @@ export async function chiffrerArticle(articleProjetId: number, payload: {
  * Transitions project status: en_cours → termine
  * Backend automatically transitions all articles: chiffre → en_attente_validation
  */
-export async function soumettreDevis(projetId: number, fournisseurNom: string): Promise<ProjetFournisseurResponse> {
+export async function soumettreDevis(
+  projetId: number,
+  fournisseurNom: string,
+  userId?: string,
+  userName?: string
+): Promise<ProjetFournisseurResponse> {
   const url = `${getBackendURL()}/api/projet-fournisseur/projets/${projetId}/status?fournisseurNom=${encodeURIComponent(fournisseurNom)}`;
+  const payload: any = { status: 'termine' };
+  if (userId) payload.chiffrePar = userId;
+  if (userName) payload.chiffreParNom = userName;
+  
   const response = await fetch(url, {
     method: 'PUT',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ status: 'termine' }),
+    body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Erreur lors de la soumission du devis.');
   const result = await response.json();

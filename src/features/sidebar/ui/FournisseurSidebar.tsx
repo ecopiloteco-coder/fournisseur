@@ -106,11 +106,10 @@ export const FournisseurSidebar: React.FC<FournisseurSidebarProps> = ({
                   key={item.path}
                   to={item.path}
                   title={collapsed ? item.label : undefined}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors relative ${
-                    active
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                      : 'hover:bg-sidebar-accent/20 text-sidebar-foreground/80'
-                  }`}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors relative ${active
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                    : 'hover:bg-sidebar-accent/20 text-sidebar-foreground/80'
+                    }`}
                 >
                   <span className="flex-shrink-0">{item.icon}</span>
                   {!collapsed && <span className="truncate">{item.label}</span>}
