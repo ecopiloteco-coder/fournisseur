@@ -19,6 +19,7 @@ export default function NouveauPrixModal({ onClose, onAdd, isSubmitting }) {
 
   const handleAdd = () => {
     if (!isValid) return
+    const coefficientVente = form.coefficient === '' ? null : parseFloat(form.coefficient)
     onAdd({
       prixUnitaire: parseFloat(form.pu) || 0,
       dateDebut: form.date,
@@ -26,7 +27,7 @@ export default function NouveauPrixModal({ onClose, onAdd, isSubmitting }) {
       accessoires: parseFloat(form.accessoires) || 0,
       pose: parseFloat(form.pose) || 0,
       cadence: parseInt(form.cadence) || 0,
-      coefficientVente: parseFloat(form.coefficient) || 0,
+      coefficientVente,
     })
     onClose()
   }

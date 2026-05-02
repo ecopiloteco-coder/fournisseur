@@ -77,6 +77,10 @@ export async function uploadDocumentArticle(articleId, file) {
 // ─── Flow complet ─────────────────────────────────────────────────────────────
 
 export async function createArticleComplet(form, documentFile, ajouteParUUID) {
+  const coefficientVente = form.coefficient === '' || form.coefficient == null
+    ? null
+    : parseFloat(form.coefficient)
+
   const article = await createArticleFournisseur({
     lot: form.lot,
     nomArticle: form.nom,
@@ -92,7 +96,7 @@ export async function createArticleComplet(form, documentFile, ajouteParUUID) {
     accessoires: parseFloat(form.accessoires) || 0,
     pose: parseFloat(form.pose) || 0,
     cadence: parseFloat(form.cadence) || 0,
-    coefficientVente: parseFloat(form.coefficient) || 0,
+    coefficientVente,
     dateDebut: form.date,
     ajoutePar: ajouteParUUID,
   })
