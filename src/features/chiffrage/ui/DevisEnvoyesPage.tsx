@@ -170,7 +170,7 @@ export function DevisEnvoyesPage() {
   const [descriptionRefus, setDescriptionRefus] = useState('');
   const [processingAction, setProcessingAction] = useState(false);
 
-  const userEntreprise = user?.entreprisePublicId || user?.keycloakId || (user?.entrepriseId ? String(user.entrepriseId) : '');
+  const userEntreprise = user?.keycloakId || user?.entreprisePublicId || (user?.entrepriseId ? String(user.entrepriseId) : '');
 
   const loadProjects = useCallback(async () => {
     if (!userEntreprise) {
@@ -182,6 +182,7 @@ export function DevisEnvoyesPage() {
     try {
       setIsLoading(true);
       setError(null);
+      console.log('[DevisEnvoyes] Loading projects with userEntreprise:', userEntreprise);
       const data = await fetchDemandesParEntreprise(userEntreprise);
       setProjects(data.map(mapProject));
     } catch (err: any) {

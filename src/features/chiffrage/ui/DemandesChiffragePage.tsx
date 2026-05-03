@@ -48,7 +48,9 @@ export function DemandesChiffragePage() {
     }
     try {
       setIsLoading(true);
-      const userId = user.entreprisePublicId || user.keycloakId || String(user.entrepriseId);
+      // Use same identifier priority as dashboard: keycloakId first (UUID), then entreprisePublicId
+      const userId = user.keycloakId || user.entreprisePublicId || String(user.entrepriseId);
+      console.log('[Demandes] Loading with userId:', userId);
       const data = await fetchDemandesParEntreprise(userId);
       setProjects(mapDemandes(data));
     } catch (err: any) {

@@ -41,6 +41,20 @@ export async function fetchArticlesFournisseur() {
   return handleResponse(res)
 }
 
+export async function fetchHistoriquePrixAnalytics(userEntreprise) {
+  const query = userEntreprise
+    ? `?userEntreprise=${encodeURIComponent(userEntreprise)}`
+    : ''
+  const res = await fetch(`${BASE()}/analytics/historique${query}`, {
+    headers: {
+      ...authHeaders(),
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
+    }
+  })
+  return handleResponse(res)
+}
+
 export async function createArticleFournisseur(payload) {
   const res = await fetch(BASE(), {
     method: 'POST',

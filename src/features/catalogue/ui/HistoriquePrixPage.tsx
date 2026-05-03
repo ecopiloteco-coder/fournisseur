@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { fetchHistoriquePrixAnalytics } from '../../btp/articleFournisseurService';
 
-const topArticles = [
+const fallbackTopArticles = [
   { name: 'Bandes podotactiles', cat: 'Peinture', pct: '7%' },
   { name: 'Trappe de visite basculante', cat: 'Menuiseries Intérieures', pct: '43%' },
   { name: 'Pissette à prolonger', cat: 'Etanchéité', pct: '6%' },
@@ -8,30 +9,130 @@ const topArticles = [
   { name: 'Bouchement stépoc', cat: 'Gros œuvres', pct: '53%' },
 ];
 
-const recentAdjustments = [
+const fallbackRecentAdjustments = [
   { article: 'Bloc porte bois Renobloc', ref: 'MT - 001', old: '259.00 €', new: '262.00 €', var: '+ 0.06 %', date: '15 / 04 / 2026' },
   { article: 'Autoportant droit et incliné', ref: 'MT - 001', old: '53.44 €', new: '76.90 €', var: '+ 0.06 %', date: '15 / 04 / 2026' },
   { article: 'Chauffe bain Gaz 150L', ref: 'MT - 001', old: '255.45 €', new: '286.40 €', var: '+ 0.06 %', date: '15 / 04 / 2026' }
 ];
 
+const fallbackChartSeries = [
+  { name: 'Bloc porte bois Renobloc', data: [200, 60, 150, 125, 50, 15, 90, 115, 140, 125] },
+  { name: 'Isolation en polyuréthanne 80 R3.45', data: [55, 100, 55, 175, 55, 105, 140, 155, 55, 175] },
+  { name: 'Autoportant droit et incliné', data: [80, 35, 80, 125, 50, 205, 35, 60, 95, 125] }
+];
+
+const fallbackYears = ['2018', '2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027'];
+
+type HistoriqueAnalytics = {
+  years?: number[];
+  top3AnnualEvolution?: Array<{ articleName?: string; values?: number[] }>;
+  top5AnnualUsage?: Array<{ articleName?: string; lot?: string; usagePercent?: number }>;
+  latestTariffAdjustments?: Array<{
+    articleName?: string;
+    refArticle?: string;
+    oldPrice?: number;
+    newPrice?: number;
+    variationPercent?: number;
+    adjustmentDate?: string;
+  }>;
+};
+
+const euro = (value: number | string | null | undefined) => {
+  const num = Number(value ?? 0);
+  return `${num.toFixed(2)} €`;
+};
+
+const percent = (value: number | null | undefined) => {
+  const num = Number(value ?? 0);
+  const sign = num >= 0 ? '+' : '';
+  return `${sign}${num.toFixed(2)} %`;
+};
+
+const asDate = (isoDate?: string) => {
+  if (!isoDate) return '—';
+  const d = new Date(isoDate);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('fr-FR').replace(/\//g, ' / ');
+};
+
 export function HistoriquePrixPage() {
   const chartRef = useRef<HTMLDivElement>(null);
+  const chartInstanceRef = useRef<any>(null);
+  const [analytics, setAnalytics] = useState<HistoriqueAnalytics | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const user = JSON.parse(sessionStorage.getItem('fournisseur_user') || '{}');
+        const userEntreprise =
+          user?.keycloakId ||
+          user?.entreprisePublicId ||
+          (user?.entrepriseId ? String(user.entrepriseId) : '');
+        const data = await fetchHistoriquePrixAnalytics(userEntreprise);
+        setAnalytics(data || null);
+      } catch {
+        setAnalytics(null);
+      }
+    };
+    void load();
+  }, []);
+
+  const years = useMemo(() => {
+    const values = analytics?.years;
+    return Array.isArray(values) && values.length > 0
+      ? values.map((y) => String(y))
+      : fallbackYears;
+  }, [analytics]);
+
+  const chartSeries = useMemo(() => {
+    const values = analytics?.top3AnnualEvolution;
+    if (!Array.isArray(values) || values.length === 0) {
+      return fallbackChartSeries;
+    }
+    return values.slice(0, 3).map((s, idx) => ({
+      name: s.articleName || `Article ${idx + 1}`,
+      data: Array.isArray(s.values) && s.values.length > 0 ? s.values : new Array(years.length).fill(0),
+    }));
+  }, [analytics, years.length]);
+
+  const topArticles = useMemo(() => {
+    const values = analytics?.top5AnnualUsage;
+    if (!Array.isArray(values) || values.length === 0) {
+      return fallbackTopArticles;
+    }
+    return values.slice(0, 5).map((item) => ({
+      name: item.articleName || 'Article',
+      cat: item.lot || 'Non classé',
+      pct: `${Math.round(Number(item.usagePercent ?? 0))}%`,
+    }));
+  }, [analytics]);
+
+  const recentAdjustments = useMemo(() => {
+    const values = analytics?.latestTariffAdjustments;
+    if (!Array.isArray(values) || values.length === 0) {
+      return fallbackRecentAdjustments;
+    }
+    return values.slice(0, 8).map((adj) => ({
+      article: adj.articleName || 'Article',
+      ref: adj.refArticle || '—',
+      old: euro(adj.oldPrice),
+      new: euro(adj.newPrice),
+      var: percent(adj.variationPercent),
+      date: asDate(adj.adjustmentDate),
+    }));
+  }, [analytics]);
 
   useEffect(() => {
     if ((window as any).ApexCharts && chartRef.current) {
       const options = {
-        series: [
-          { name: 'Bloc porte bois Renobloc', data: [200, 60, 150, 125, 50, 15, 90, 115, 140, 125] },
-          { name: 'Isolation en polyuréthanne 80 R3.45', data: [55, 100, 55, 175, 55, 105, 140, 155, 55, 175] },
-          { name: 'Autoportant droit et incliné', data: [80, 35, 80, 125, 50, 205, 35, 60, 95, 125] }
-        ],
+        series: chartSeries,
         chart: { type: 'bar', height: 320, toolbar: { show: false }, parentHeightOffset: 0 },
         plotOptions: { bar: { columnWidth: '35%', borderRadius: 2 } },
         colors: ['#0084FF', '#22C55E', '#38BDF8'],
         dataLabels: { enabled: false },
         stroke: { show: true, width: 2, colors: ['transparent'] },
         xaxis: {
-          categories: ['2018', '2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027'],
+          categories: years,
           axisBorder: { show: false }, axisTicks: { show: false },
           labels: { style: { colors: '#94a3b8', fontSize: '11px', fontWeight: 600 } }
         },
@@ -40,11 +141,20 @@ export function HistoriquePrixPage() {
         grid: { strokeDashArray: 4, borderColor: '#e2e8f0' }
       };
 
+      if (chartInstanceRef.current) {
+        chartInstanceRef.current.destroy();
+      }
       const chart = new (window as any).ApexCharts(chartRef.current, options);
       chart.render();
-      return () => chart.destroy();
+      chartInstanceRef.current = chart;
+      return () => {
+        if (chartInstanceRef.current) {
+          chartInstanceRef.current.destroy();
+          chartInstanceRef.current = null;
+        }
+      };
     }
-  }, []);
+  }, [chartSeries, years]);
 
   return (
     <div className="animate__animated animate__fadeIn pb-5" style={{ minHeight: '100vh', backgroundColor: '#F8FAFC' }}>

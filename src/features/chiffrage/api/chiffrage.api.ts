@@ -107,14 +107,18 @@ const getAuthHeaders = (): Record<string, string> => {
 /** Fetch all projects for a supplier company */
 export async function fetchDemandesParEntreprise(userEntreprise: string): Promise<ProjetFournisseurResponse[]> {
   const url = `${getBackendURL()}/api/projet-fournisseur/projets?userEntreprise=${encodeURIComponent(userEntreprise)}`;
+  console.log('[chiffrage.api] Fetching demandes from:', url);
   const response = await fetch(url, { headers: getAuthHeaders() });
 
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[chiffrage.api] Error response:', { status: response.status, errorText });
     if (response.status === 401) throw new Error('Non autorisé. Veuillez vous reconnecter.');
     throw new Error('Erreur lors de la récupération des demandes de chiffrage.');
   }
 
   const result = await response.json();
+  console.log('[chiffrage.api] Demandes loaded:', result);
   const data = result.data || result || [];
   return Array.isArray(data) ? data : [];
 }
