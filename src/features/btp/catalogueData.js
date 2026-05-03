@@ -134,6 +134,7 @@ export const EMPTY_FORM = {
   pu: '',
   unite: '',
   document: null,
+  decompose: false,
   fourniture: '',
   accessoires: '',
   pose: '',

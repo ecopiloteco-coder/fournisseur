@@ -158,12 +158,14 @@ export async function soumettreDevis(
   projetId: number,
   fournisseurNom: string,
   userId?: string,
-  userName?: string
+  userName?: string,
+  montantHt?: number
 ): Promise<ProjetFournisseurResponse> {
   const url = `${getBackendURL()}/api/projet-fournisseur/projets/${projetId}/status?fournisseurNom=${encodeURIComponent(fournisseurNom)}`;
   const payload: any = { status: 'termine' };
   if (userId) payload.chiffrePar = userId;
   if (userName) payload.chiffreParNom = userName;
+  if (typeof montantHt === 'number' && montantHt > 0) payload.prixTotal = montantHt;
   
   const response = await fetch(url, {
     method: 'PUT',

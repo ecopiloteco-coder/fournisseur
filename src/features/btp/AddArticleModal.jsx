@@ -3,9 +3,15 @@ import { LOTS_OPTIONS, UNITES_OPTIONS, EMPTY_FORM } from './catalogueData'
 
 /**
  * AddArticleModal — modal to add a new article to the library.
+ * @param {Object} props
+ * @param {Function} props.onClose - callback when modal closes
+ * @param {Function} props.onAdd - callback when article is added (receives form, file)
+ * @param {string} [props.serverError] - optional error message to display
+ * @param {Object} [props.initialData] - optional initial form data for pre-filling
+ * @param {boolean} [props.isSubmitting] - optional override for submit button state
  */
-export default function AddArticleModal({ onClose, onAdd, serverError }) {
-  const [form, setForm] = useState(EMPTY_FORM)
+export default function AddArticleModal({ onClose, onAdd, serverError, initialData, isSubmitting: isSubmittingProp }) {
+  const [form, setForm] = useState(initialData || EMPTY_FORM)
   const [isSubmitting, setSubmitting] = useState(false)
   const fileRef = useRef(null)
 
@@ -148,64 +154,85 @@ export default function AddArticleModal({ onClose, onAdd, serverError }) {
               />
             </div>
 
-            {/* Row 5 — Fourniture + Accessoires + Pose */}
-            <div className="row g-3 mb-3">
-              <div className="col-4">
-                <FormLabel text="Fourniture (€)" />
-                <input
-                  type="number"
-                  className="form-control form-control-sm bg-light border-0 rounded-3"
-                  placeholder="Saisir le montant"
-                  value={form.fourniture}
-                  onChange={e => set('fourniture', e.target.value)}
-                />
-              </div>
-              <div className="col-4">
-                <FormLabel text="Accessoires (€)" />
-                <input
-                  type="number"
-                  className="form-control form-control-sm bg-light border-0 rounded-3"
-                  placeholder="Saisir le montant"
-                  value={form.accessoires}
-                  onChange={e => set('accessoires', e.target.value)}
-                />
-              </div>
-              <div className="col-4">
-                <FormLabel text="Pose (€)" />
-                <input
-                  type="number"
-                  className="form-control form-control-sm bg-light border-0 rounded-3"
-                  placeholder="Saisir le montant"
-                  value={form.pose}
-                  onChange={e => set('pose', e.target.value)}
-                />
-              </div>
+            {/* Decompose Checkbox */}
+            <div className="form-check mb-3 d-flex align-items-center gap-2">
+              <input
+                className="form-check-input mt-0 shadow-none"
+                type="checkbox"
+                id="decomposeCheck"
+                checked={form.decompose || false}
+                onChange={e => set('decompose', e.target.checked)}
+                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              <label className="form-check-label text-muted fw-medium" htmlFor="decomposeCheck" style={{ fontSize: '13px', cursor: 'pointer' }}>
+                Je souhaite décomposer le prix
+              </label>
             </div>
 
-            {/* Row 6 — Cadence + Coefficient */}
-            <div className="row g-3 mb-3">
-              <div className="col-6">
-                <FormLabel text="Cadence en heure" />
-                <input
-                  type="number"
-                  className="form-control form-control-sm bg-light border-0 rounded-3"
-                  placeholder="Saisir la cadence"
-                  value={form.cadence}
-                  onChange={e => set('cadence', e.target.value)}
-                />
+            {/* Conditional Decompose Fields */}
+            {form.decompose && (
+              <div className="animate__animated animate__fadeIn" style={{ marginBottom: '1rem' }}>
+
+                {/* Row 5 — Fourniture + Accessoires + Pose */}
+                <div className="row g-3 mb-3">
+                  <div className="col-4">
+                    <FormLabel text="Fourniture (€)" />
+                    <input
+                      type="number"
+                      className="form-control form-control-sm bg-light border-0 rounded-3"
+                      placeholder="Saisir le montant"
+                      value={form.fourniture}
+                      onChange={e => set('fourniture', e.target.value)}
+                    />
+                  </div>
+                  <div className="col-4">
+                    <FormLabel text="Accessoires (€)" />
+                    <input
+                      type="number"
+                      className="form-control form-control-sm bg-light border-0 rounded-3"
+                      placeholder="Saisir le montant"
+                      value={form.accessoires}
+                      onChange={e => set('accessoires', e.target.value)}
+                    />
+                  </div>
+                  <div className="col-4">
+                    <FormLabel text="Pose (€)" />
+                    <input
+                      type="number"
+                      className="form-control form-control-sm bg-light border-0 rounded-3"
+                      placeholder="Saisir le montant"
+                      value={form.pose}
+                      onChange={e => set('pose', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Row 6 — Cadence + Coefficient */}
+                <div className="row g-3 mb-3">
+                  <div className="col-6">
+                    <FormLabel text="Cadence en heure" />
+                    <input
+                      type="number"
+                      className="form-control form-control-sm bg-light border-0 rounded-3"
+                      placeholder="Saisir la cadence"
+                      value={form.cadence}
+                      onChange={e => set('cadence', e.target.value)}
+                    />
+                  </div>
+                  <div className="col-6">
+                    <FormLabel text="Coefficient de vente" />
+                    <input
+                      type="number"
+                      step="0.1"
+                      className="form-control form-control-sm bg-light border-0 rounded-3"
+                      placeholder="Saisir le coefficient"
+                      value={form.coefficient}
+                      onChange={e => set('coefficient', e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="col-6">
-                <FormLabel text="Coefficient de vente" />
-                <input
-                  type="number"
-                  step="0.1"
-                  className="form-control form-control-sm bg-light border-0 rounded-3"
-                  placeholder="Saisir le coefficient"
-                  value={form.coefficient}
-                  onChange={e => set('coefficient', e.target.value)}
-                />
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Erreur serveur */}
@@ -232,16 +259,16 @@ export default function AddArticleModal({ onClose, onAdd, serverError }) {
               className="btn rounded-pill px-4 fw-semibold d-flex align-items-center gap-2"
               style={{
                 minWidth: 120, fontSize: 14,
-                background: isValid && !isSubmitting ? '#0978E8' : '#cbd5e1',
+                background: isValid && !isSubmitting && !isSubmittingProp ? '#0978E8' : '#cbd5e1',
                 color: '#fff', border: 'none',
               }}
               onClick={handleAdd}
-              disabled={!isValid || isSubmitting}
+              disabled={!isValid || isSubmitting || isSubmittingProp}
             >
-              {isSubmitting && (
+              {(isSubmitting || isSubmittingProp) && (
                 <span className="spinner-border spinner-border-sm" role="status" />
               )}
-              {isSubmitting ? 'Ajout...' : 'Ajouter'}
+              {isSubmitting || isSubmittingProp ? 'Ajout...' : 'Ajouter'}
             </button>
           </div>
 

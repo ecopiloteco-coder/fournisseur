@@ -5,6 +5,9 @@ import { fetchDemandeById, chiffrerArticle, soumettreDevis, ProjetFournisseurRes
 import { getBackendURL, getNotificationBackendURL } from '../../../shared/lib/api-bridge';
 import { useRealtimeSocket } from '../../../shared/providers/RealtimeSocketProvider';
 import { jwtDecode } from 'jwt-decode';
+import { toast } from 'sonner';
+import AddArticleModal from '../../btp/AddArticleModal';
+import { createArticleComplet, fetchArticlesFournisseur } from '../../btp/articleFournisseurService';
 
 function playNotificationSound() {
   try {
@@ -21,6 +24,15 @@ function playNotificationSound() {
     osc.start();
     osc.stop(ctx.currentTime + 0.12);
   } catch {
+  }
+}
+
+function getConnectedUserUUID() {
+  try {
+    const user = JSON.parse(sessionStorage.getItem('fournisseur_user') || '{}')
+    return user.keycloakId || null
+  } catch {
+    return null
   }
 }
 
@@ -72,7 +84,11 @@ export function ChiffrageProjetPage() {
   // Associate Modal
   const [associateModal, setAssociateModal] = useState<{ isOpen: boolean; article?: any }>({ isOpen: false });
   const [associateSearch, setAssociateSearch] = useState('');
-  const [associateLot, setAssociateLot] = useState('Lot 2 : Menuiseries Intérieures');
+  const [associateLot, setAssociateLot] = useState('');
+  const [associateArticles, setAssociateArticles] = useState<any[]>([]);
+  const [associateLoading, setAssociateLoading] = useState(false);
+  const [associatePage, setAssociatePage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
 
   // Unpriced Warning Modal
   const [unpricedWarningModal, setUnpricedWarningModal] = useState(false);
@@ -296,6 +312,68 @@ export function ChiffrageProjetPage() {
 
   const isArticlePending = (a: any) => a.statusInterne === 'en_attente_chiffrage' || a.statusInterne === 'Non chiffré' || a.statusInterne === 'Non chiffre';
 
+  // ── Associate Modal Logic ──────────────────────────────────────────────────────
+  
+  useEffect(() => {
+    if (!associateModal.isOpen) return;
+    setAssociateLoading(true);
+    setAssociatePage(1);
+    fetchArticlesFournisseur()
+      .then(data => {
+        if (!Array.isArray(data)) {
+          setAssociateArticles([]);
+          return;
+        }
+        // Enrichir chaque article avec le dernier prix
+        const articlesWithPrix = data.map(a => {
+          const activePrix = a.prix?.find((p: any) => p.isActive) ?? a.prix?.[0] ?? null;
+          return {
+            ...a,
+            pu: activePrix?.prixUnitaire ?? 0,
+            lastPrixDate: activePrix?.dateDebut ?? null,
+          };
+        });
+        setAssociateArticles(articlesWithPrix);
+      })
+      .catch(err => {
+        console.error('Erreur lors du chargement des articles:', err);
+        setAssociateArticles([]);
+      })
+      .finally(() => setAssociateLoading(false));
+  }, [associateModal.isOpen]);
+
+  const filteredAssociateArticles = useMemo(() => {
+    return associateArticles.filter(a => {
+      const matchesSearch = !associateSearch || 
+        a.nomArticle?.toLowerCase().includes(associateSearch.toLowerCase()) ||
+        a.refArticle?.toLowerCase().includes(associateSearch.toLowerCase());
+      const matchesLot = !associateLot || a.lot === associateLot;
+      return matchesSearch && matchesLot;
+    });
+  }, [associateArticles, associateSearch, associateLot]);
+
+  const totalAssociatePages = Math.ceil(filteredAssociateArticles.length / ITEMS_PER_PAGE);
+  const paginatedAssociateArticles = useMemo(() => {
+    const start = (associatePage - 1) * ITEMS_PER_PAGE;
+    return filteredAssociateArticles.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredAssociateArticles, associatePage]);
+
+  const uniqueLots = useMemo(() => {
+    const lots = [...new Set(associateArticles.map(a => a.lot).filter(Boolean))];
+    return lots.sort();
+  }, [associateArticles]);
+
+  const handleAssociateArticle = (article: any) => {
+    const articleId = associateModal.article?.id;
+    if (articleId && article.pu) {
+      setArticles(a => a.map(art => 
+        art.id === articleId ? { ...art, price: Number(article.pu), remise: Number(article.pu), statusInterne: 'chiffre' } : art
+      ));
+      toast.success(`Prix ${article.pu}€ appliqué avec succès`);
+    }
+    setAssociateModal({ isOpen: false });
+  };
+
   const filteredArticles = useMemo(() => articles.filter(a => {
     const matchesSearch = a.label.toLowerCase().includes(searchTerm.toLowerCase()) || a.code.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch && (filterMissing ? isArticlePending(a) : true);
@@ -364,10 +442,11 @@ export function ChiffrageProjetPage() {
       }
       const userId = user.keycloakId || String(user.entrepriseId);
       
-      await soumettreDevis(projet.id, user.nomEntreprise || 'Fournisseur', userId, realName);
-      navigate('/chiffrage/demandes');
+      await soumettreDevis(projet.id, user.nomEntreprise || 'Fournisseur', userId, realName, totalHT);
+      toast.success('Devis envoyé avec succès ! 📄');
+      navigate('/chiffrage/devis');
     } catch (err: any) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -482,6 +561,22 @@ export function ChiffrageProjetPage() {
       });
       setChatDraft('');
     } catch (err) {}
+  };
+
+  const handleAddLibraryArticle = async (form: any, documentFile: File | null) => {
+    try {
+      const uuid = getConnectedUserUUID();
+      if (!uuid) {
+        toast.error('Impossible de récupérer l\'identifiant utilisateur');
+        return;
+      }
+
+      await createArticleComplet(form, documentFile, uuid);
+      toast.success('Article ajouté avec succès à la bibliothèque !');
+      setLibraryModal({ isOpen: false });
+    } catch (err: any) {
+      toast.error(`Erreur lors de l'ajout: ${err.message || 'Erreur inconnue'}`);
+    }
   };
 
   if (isLoading) return <div className="p-5 text-center"><div className="spinner-border text-primary" /></div>;
@@ -1124,107 +1219,11 @@ export function ChiffrageProjetPage() {
 
       {/* Library/Catalogue Modal */}
       {libraryModal.isOpen && (
-        <>
-          <div className="modal-backdrop fade show" style={{ zIndex: 9000, backgroundColor: 'rgba(0,0,0,0.5)' }}></div>
-          <div className="modal fade show d-block" tabIndex={-1} style={{ zIndex: 9001 }}>
-            <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '600px' }}>
-              <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden animate__animated animate__fadeIn">
-                <div className="modal-header border-bottom bg-white p-4 pb-3">
-                  <h5 className="modal-title fw-extrabold text-dark d-flex align-items-center gap-2" style={{ fontSize: '15.5px' }}>
-                    <div className="avatar avatar-xs bg-primary bg-opacity-10 text-primary rounded-1 d-flex align-items-center justify-content-center" style={{ width: '28px', height: '28px' }}>
-                      <i className="fi fi-rr-book-alt" style={{ fontSize: '14px' }}></i>
-                    </div>
-                    Ajouter un article dans la bibliothèque
-                  </h5>
-                  <button type="button" className="btn-close shadow-none" onClick={() => setLibraryModal({ isOpen: false })}></button>
-                </div>
-                <div className="modal-body p-4 bg-white" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
-                  <div className="row g-3 mb-3">
-                    <div className="col-md-6">
-                      <label className="form-label small fw-bold text-dark mb-1">Lot article <span className="text-danger">*</span></label>
-                      <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Choisir le lot" value={libraryFormData.lot} onChange={e => setLibraryFormData({...libraryFormData, lot: e.target.value})} />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label small fw-bold text-dark mb-1">REF <span className="text-danger">*</span></label>
-                      <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir la référence" value={libraryFormData.ref} onChange={e => setLibraryFormData({...libraryFormData, ref: e.target.value})} />
-                    </div>
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label small fw-bold text-dark mb-1">Nom article <span className="text-danger">*</span></label>
-                    <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir le nom de l'article" value={libraryFormData.nom} onChange={e => setLibraryFormData({...libraryFormData, nom: e.target.value})} />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label small fw-bold text-dark mb-1">Date <span className="text-danger">*</span></label>
-                    <div className="position-relative">
-                      <input type="date" className="form-control form-control-sm border-0 shadow-none px-3 py-2 text-muted" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} value={libraryFormData.date} onChange={e => setLibraryFormData({...libraryFormData, date: e.target.value})} />
-                    </div>
-                  </div>
-                  <div className="row g-3 mb-3">
-                    <div className="col-md-6">
-                      <label className="form-label small fw-bold text-dark mb-1">Prix unitaire <span className="text-danger">*</span></label>
-                      <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir le prix unitaire" value={libraryFormData.prixUnitaire} onChange={e => setLibraryFormData({...libraryFormData, prixUnitaire: e.target.value})} />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label small fw-bold text-dark mb-1">Unité <span className="text-danger">*</span></label>
-                      <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir l'unité" value={libraryFormData.unite} onChange={e => setLibraryFormData({...libraryFormData, unite: e.target.value})} />
-                    </div>
-                  </div>
-                  <div className="mb-4">
-                    <label className="form-label small fw-bold text-dark mb-2">Document</label>
-                    <div>
-                      <button className="btn btn-sm text-primary border-0 rounded-3 px-3 py-2 d-inline-flex align-items-center gap-2 fw-bold" style={{ backgroundColor: '#F3F6FC', fontSize: '12px' }}>
-                        <i className="fi fi-rr-upload fs-6"></i> Importer un document
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="form-check mb-3 d-flex align-items-center gap-2 custom-check">
-                    <input className="form-check-input mt-0 shadow-none" type="checkbox" id="decomposeCheck" checked={libraryFormData.decompose} onChange={e => setLibraryFormData({...libraryFormData, decompose: e.target.checked})} style={{ width: '16px', height: '16px' }} />
-                    <label className="form-check-label text-muted fw-medium" htmlFor="decomposeCheck" style={{ fontSize: '13px' }}>
-                      Je souhaite décomposer le prix
-                    </label>
-                  </div>
-
-                  {libraryFormData.decompose && (
-                    <div className="animate__animated animate__fadeIn">
-                      <div className="row g-3 mb-3">
-                        <div className="col-md-4">
-                          <label className="form-label small fw-bold text-dark mb-1">Fourniture (€)</label>
-                          <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir le montant" value={libraryFormData.fourniture} onChange={e => setLibraryFormData({...libraryFormData, fourniture: e.target.value})} />
-                        </div>
-                        <div className="col-md-4">
-                          <label className="form-label small fw-bold text-dark mb-1">Accessoires (€)</label>
-                          <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir le montant" value={libraryFormData.accessoires} onChange={e => setLibraryFormData({...libraryFormData, accessoires: e.target.value})} />
-                        </div>
-                        <div className="col-md-4">
-                          <label className="form-label small fw-bold text-dark mb-1">Pose (€)</label>
-                          <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir le montant" value={libraryFormData.pose} onChange={e => setLibraryFormData({...libraryFormData, pose: e.target.value})} />
-                        </div>
-                      </div>
-                      <div className="row g-3 mb-3">
-                        <div className="col-md-6">
-                          <label className="form-label small fw-bold text-dark mb-1">Cadence en heure</label>
-                          <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir la cadence" value={libraryFormData.cadence} onChange={e => setLibraryFormData({...libraryFormData, cadence: e.target.value})} />
-                        </div>
-                        <div className="col-md-6">
-                          <label className="form-label small fw-bold text-dark mb-1">Coefficient de vente</label>
-                          <input type="text" className="form-control form-control-sm border-0 shadow-none px-3 py-2" style={{ backgroundColor: '#F3F6FC', borderRadius: '8px' }} placeholder="Saisir le coefficient" value={libraryFormData.coefficient} onChange={e => setLibraryFormData({...libraryFormData, coefficient: e.target.value})} />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="modal-footer border-top-0 d-flex justify-content-center p-4 pt-3 pb-4 space-x-3 gap-3">
-                  <button type="button" className="btn bg-white border border-primary text-primary rounded-pill px-5 py-2 fw-bold shadow-sm hover:bg-light transition-all" style={{ minWidth: '140px', fontSize: '13px' }} onClick={() => setLibraryModal({ isOpen: false })}>Annuler</button>
-                  <button type="button" className="btn btn-primary rounded-pill px-5 py-2 fw-bold shadow-sm transition-all" style={{ minWidth: '140px', backgroundColor: '#6Cb2FF', borderColor: '#6Cb2FF', fontSize: '13px' }} onClick={() => {
-                    alert('Article sauvegardé dans la bibliothèque !');
-                    setLibraryModal({ isOpen: false });
-                  }}>Confirmer</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
+        <AddArticleModal
+          initialData={libraryFormData}
+          onClose={() => setLibraryModal({ isOpen: false })}
+          onAdd={handleAddLibraryArticle}
+        />
       )}
 
       {/* Associate Modal */}
@@ -1242,78 +1241,148 @@ export function ChiffrageProjetPage() {
                     Associer à un article existant
                   </h5>
                   
-                  <div className="d-flex justify-content-between align-items-center mb-4">
+                  <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
                     <div className="d-flex gap-3 flex-grow-1" style={{ maxWidth: '650px' }}>
                       <div className="position-relative flex-grow-1" style={{ maxWidth: '300px' }}>
                         <i className="fi fi-rr-search position-absolute top-50 translate-middle-y text-primary" style={{ left: '16px' }}></i>
-                        <input type="text" className="form-control form-control-sm border ps-5 py-2 shadow-none rounded-pill" placeholder="Rechercher" value={associateSearch} onChange={e => setAssociateSearch(e.target.value)} />
+                        <input 
+                          type="text" 
+                          className="form-control form-control-sm border ps-5 py-2 shadow-none rounded-pill" 
+                          placeholder="Rechercher par nom ou REF"
+                          value={associateSearch}
+                          onChange={e => {
+                            setAssociateSearch(e.target.value);
+                            setAssociatePage(1);
+                          }}
+                        />
                       </div>
-                      <select className="form-select form-select-sm border-0 py-2 shadow-none rounded-pill" style={{ maxWidth: '280px', backgroundColor: '#F8FAFC' }} value={associateLot} onChange={e => setAssociateLot(e.target.value)}>
-                        <option value="Lot 2 : Menuiseries Intérieures">Lot 2 : Menuiseries Intérieures</option>
-                        <option value="Serrurerie metallerie">Serrurerie metallerie</option>
-                        <option value="Etanchéité">Etanchéité</option>
-                        <option value="Couverture">Couverture</option>
-                        <option value="CVC Plomberie">CVC Plomberie</option>
+                      <select 
+                        className="form-select form-select-sm border-0 py-2 shadow-none rounded-pill" 
+                        style={{ maxWidth: '250px', backgroundColor: '#F8FAFC' }}
+                        value={associateLot}
+                        onChange={e => {
+                          setAssociateLot(e.target.value);
+                          setAssociatePage(1);
+                        }}
+                      >
+                        <option value="">Tous les lots</option>
+                        {uniqueLots.map(lot => (
+                          <option key={lot} value={lot}>{lot}</option>
+                        ))}
                       </select>
                     </div>
                     <div className="d-flex gap-3">
-                       <button type="button" className="btn bg-white border border-primary text-primary rounded-pill px-4 py-2 fw-bold shadow-sm hover:bg-light" style={{ fontSize: '13px', minWidth: '110px' }} onClick={() => setAssociateModal({ isOpen: false })}>Annuler</button>
-                       <button type="button" className="btn btn-primary rounded-pill px-4 py-2 fw-bold shadow-sm" style={{ backgroundColor: '#6Cb2FF', borderColor: '#6Cb2FF', fontSize: '13px', minWidth: '110px' }} onClick={() => setAssociateModal({ isOpen: false })}>Terminer</button>
+                       <button type="button" className="btn bg-white border border-primary text-primary rounded-pill px-4 py-2 fw-bold shadow-sm" style={{ fontSize: '13px', minWidth: '110px' }} onClick={() => setAssociateModal({ isOpen: false })}>Annuler</button>
                     </div>
                   </div>
 
-                  <div className="table-responsive mb-4">
-                    <table className="table table-borderless align-middle mb-0" style={{ borderCollapse: 'separate', borderSpacing: '0' }}>
-                      <thead style={{ backgroundColor: '#0978E8' }}>
-                        <tr className="small text-uppercase border-0" style={{ letterSpacing: '0.5px' }}>
-                          <th className="text-white fw-bold py-3 px-4 bg-transparent" style={{ fontSize: '12px', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>LOT</th>
-                          <th className="text-white fw-bold py-3 bg-transparent" style={{ fontSize: '12px' }}>REF / Nom article</th>
-                          <th className="text-white fw-bold py-3 text-center bg-transparent" style={{ fontSize: '12px' }}>Unité</th>
-                          <th className="text-white fw-bold py-3 text-center bg-transparent" style={{ fontSize: '12px' }}>PU</th>
-                          <th className="text-white fw-bold py-3 text-center bg-transparent" style={{ fontSize: '12px' }}>Dernière mise a jour</th>
-                          <th className="text-white fw-bold py-3 text-center bg-transparent" style={{ fontSize: '12px', borderTopRightRadius: '8px', borderBottomRightRadius: '8px' }}>Associer</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr style={{ height: '12px' }}></tr>
-                        {[
-                          { lot: 'Menuiseries Intérieures', name: 'Bloc porte bois Renobloc', ref: 'MT - 001', unit: 'u', pu: '259.00', date: '15 / 04 / 2026' },
-                          { lot: 'Serrurerie metallerie', name: 'Autoportant droit et incliné', ref: 'MT - 001', unit: 'ml', pu: '53.44', date: '15 / 04 / 2026' },
-                          { lot: 'Etanchéité', name: 'Isolation en polyuréthanne 80 R3.45', ref: 'MT - 001', unit: 'm²', pu: '10.50', date: '15 / 04 / 2026' },
-                          { lot: 'Couverture', name: 'Bachage provisoire durant les travaux', ref: 'MT - 001', unit: 'm²', pu: '85.65', date: '15 / 04 / 2026' },
-                          { lot: 'CVC Plomberie', name: 'Chauffe bain Gaz 150L', ref: 'MT - 001', unit: 'u', pu: '255.45', date: '15 / 04 / 2026' }
-                        ].map((item, idx) => (
-                          <React.Fragment key={idx}>
-                            <tr style={{ backgroundColor: '#F8FAFC' }}>
-                              <td className="py-3 px-4 fw-black text-dark" style={{ fontSize: '12px', width: '18%', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>
-                                <div style={{ maxWidth: '120px', lineHeight: '1.4' }}>{item.lot}</div>
-                              </td>
-                              <td className="py-3" style={{ width: '32%' }}>
-                                 <div className="fw-extrabold text-dark mb-1" style={{ fontSize: '12px' }}>{item.name}</div>
-                                 <div className="text-muted fw-bold" style={{ fontSize: '10px', textTransform: 'uppercase' }}>{item.ref}</div>
-                              </td>
-                              <td className="py-3 text-center fw-extrabold text-dark" style={{ fontSize: '12px' }}>{item.unit}</td>
-                              <td className="py-3 text-center fw-extrabold text-dark" style={{ fontSize: '12px' }}>{item.pu} €</td>
-                              <td className="py-3 text-center fw-extrabold text-dark" style={{ fontSize: '12px' }}>{item.date}</td>
-                              <td className="py-3 text-center" style={{ borderTopRightRadius: '8px', borderBottomRightRadius: '8px' }}>
-                                 <button className="btn btn-sm btn-primary rounded-pill px-4 fw-bold shadow-sm hover:opacity-90" style={{ backgroundColor: '#6Cb2FF', borderColor: '#6Cb2FF', fontSize: '11px' }}>Choisir</button>
-                              </td>
+                  {associateLoading ? (
+                    <div className="text-center py-5">
+                      <div className="spinner-border text-primary" />
+                      <p className="text-muted mt-3">Chargement des articles...</p>
+                    </div>
+                  ) : filteredAssociateArticles.length === 0 ? (
+                    <div className="text-center py-5">
+                      <i className="fi fi-rr-inbox text-muted" style={{ fontSize: '32px' }}></i>
+                      <p className="text-muted mt-3">Aucun article trouvé</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="table-responsive mb-4">
+                        <table className="table table-borderless align-middle mb-0" style={{ borderCollapse: 'separate', borderSpacing: '0' }}>
+                          <thead style={{ backgroundColor: '#0978E8' }}>
+                            <tr className="small text-uppercase border-0" style={{ letterSpacing: '0.5px' }}>
+                              <th className="text-white fw-bold py-3 px-4 bg-transparent" style={{ fontSize: '12px', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>LOT</th>
+                              <th className="text-white fw-bold py-3 bg-transparent" style={{ fontSize: '12px' }}>REF / Nom article</th>
+                              <th className="text-white fw-bold py-3 text-center bg-transparent" style={{ fontSize: '12px' }}>Unité</th>
+                              <th className="text-white fw-bold py-3 text-center bg-transparent" style={{ fontSize: '12px' }}>PU</th>
+                              <th className="text-white fw-bold py-3 text-center bg-transparent" style={{ fontSize: '12px', borderTopRightRadius: '8px', borderBottomRightRadius: '8px' }}>Choisir</th>
                             </tr>
-                            <tr style={{ height: '8px', backgroundColor: 'transparent' }}></tr>
-                          </React.Fragment>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                          </thead>
+                          <tbody>
+                            <tr style={{ height: '12px' }}></tr>
+                            {paginatedAssociateArticles.map((item, idx) => (
+                              <React.Fragment key={idx}>
+                                <tr style={{ backgroundColor: '#F8FAFC' }}>
+                                  <td className="py-3 px-4 fw-black text-dark" style={{ fontSize: '12px', width: '18%', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>
+                                    <div style={{ maxWidth: '120px', lineHeight: '1.4' }}>{item.lot || '—'}</div>
+                                  </td>
+                                  <td className="py-3" style={{ width: '32%' }}>
+                                     <div className="fw-extrabold text-dark mb-1" style={{ fontSize: '12px' }}>{item.nomArticle || '—'}</div>
+                                     <div className="text-muted fw-bold" style={{ fontSize: '10px', textTransform: 'uppercase' }}>{item.refArticle || '—'}</div>
+                                  </td>
+                                  <td className="py-3 text-center fw-extrabold text-dark" style={{ fontSize: '12px' }}>{item.unite || '—'}</td>
+                                  <td className="py-3 text-center fw-extrabold text-dark" style={{ fontSize: '12px' }}>{item.pu || 0} €</td>
+                                  <td className="py-3 text-center" style={{ borderTopRightRadius: '8px', borderBottomRightRadius: '8px' }}>
+                                     <button 
+                                       className="btn btn-sm btn-primary rounded-pill px-4 fw-bold shadow-sm" 
+                                       style={{ backgroundColor: '#6Cb2FF', borderColor: '#6Cb2FF', fontSize: '11px' }}
+                                       onClick={() => handleAssociateArticle(item)}
+                                     >
+                                       Choisir
+                                     </button>
+                                  </td>
+                                </tr>
+                                <tr style={{ height: '8px', backgroundColor: 'transparent' }}></tr>
+                              </React.Fragment>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
 
-                  <div className="d-flex justify-content-center align-items-center gap-3 text-primary mt-3">
-                    <button className="btn btn-sm border-0 bg-transparent text-primary p-0 d-flex align-items-center justify-content-center" style={{ width: '24px' }}><i className="fi fi-rr-angle-left"></i></button>
-                    <span className="text-primary fw-bold cursor-pointer" style={{ fontSize: '13px' }}>1</span>
-                    <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold shadow-sm cursor-pointer" style={{ width: '32px', height: '32px', fontSize: '13px', backgroundColor: '#0084FF' }}>2</div>
-                    <span className="text-primary fw-medium" style={{ letterSpacing: '2px' }}>...</span>
-                    <span className="text-primary fw-bold cursor-pointer" style={{ fontSize: '13px' }}>9</span>
-                    <button className="btn btn-sm border-0 bg-transparent text-primary p-0 d-flex align-items-center justify-content-center" style={{ width: '24px' }}><i className="fi fi-rr-angle-right"></i></button>
-                  </div>
+                      {totalAssociatePages > 1 && (
+                        <div className="d-flex justify-content-center align-items-center gap-2 text-primary mt-4 flex-wrap">
+                          <button 
+                            className="btn btn-sm border-0 bg-transparent text-primary p-0 d-flex align-items-center justify-content-center" 
+                            style={{ width: '24px' }}
+                            onClick={() => setAssociatePage(Math.max(1, associatePage - 1))}
+                            disabled={associatePage === 1}
+                          >
+                            <i className="fi fi-rr-angle-left"></i>
+                          </button>
+                          {Array.from({ length: Math.min(5, totalAssociatePages) }).map((_, i) => {
+                            const pageNum = i + 1;
+                            return (
+                              <button
+                                key={pageNum}
+                                className={pageNum === associatePage ? 'btn rounded-circle d-flex align-items-center justify-content-center fw-bold shadow-sm' : 'btn btn-sm border-0 bg-transparent text-primary fw-bold'}
+                                style={pageNum === associatePage ? {
+                                  backgroundColor: '#0084FF',
+                                  color: '#fff',
+                                  width: '32px',
+                                  height: '32px',
+                                  fontSize: '13px'
+                                } : { fontSize: '13px' }}
+                                onClick={() => setAssociatePage(pageNum)}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          })}
+                          {totalAssociatePages > 5 && (
+                            <>
+                              <span className="text-primary fw-medium" style={{ letterSpacing: '2px' }}>...</span>
+                              <button
+                                className="btn btn-sm border-0 bg-transparent text-primary fw-bold"
+                                style={{ fontSize: '13px' }}
+                                onClick={() => setAssociatePage(totalAssociatePages)}
+                              >
+                                {totalAssociatePages}
+                              </button>
+                            </>
+                          )}
+                          <button 
+                            className="btn btn-sm border-0 bg-transparent text-primary p-0 d-flex align-items-center justify-content-center" 
+                            style={{ width: '24px' }}
+                            onClick={() => setAssociatePage(Math.min(totalAssociatePages, associatePage + 1))}
+                            disabled={associatePage === totalAssociatePages}
+                          >
+                            <i className="fi fi-rr-angle-right"></i>
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
