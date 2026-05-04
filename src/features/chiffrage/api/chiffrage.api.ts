@@ -65,12 +65,16 @@ export interface ProjetFournisseurResponse {
   /** Intern-side review decision */
   statusInterne: ProjetStatusInterne;
   userEntreprise: string;
+  interneEntrepriseId?: number;
   deadline: string;
   dateEnvoi?: string;
   dateRetour?: string;
   prixTotal: number;
   prixVente: number | null;
   fournisseurNom?: string;
+  fournisseurTel?: string;
+  fournisseurAdresse?: string;
+  fournisseurEmail?: string;
   creeParNom?: string;
   // Fournisseur refusal motifs
   motifRefusFournisseur?: string;

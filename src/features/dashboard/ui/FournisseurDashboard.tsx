@@ -44,8 +44,8 @@ export function FournisseurDashboard() {
     const loadDashboard = async () => {
       try {
         setLoading(true);
-        // Use same pattern as HistoriquePrixPage: prioritize keycloakId, then entreprisePublicId
-        const userIdentifier = user?.keycloakId || user?.entreprisePublicId;
+        // userEntreprise filters use entreprisePublicId in projet-fournisseur service
+        const userIdentifier = user?.entreprisePublicId || user?.keycloakId;
         if (!userIdentifier) {
           setError('User identifier not found');
           return;
@@ -62,7 +62,7 @@ export function FournisseurDashboard() {
     };
 
     loadDashboard();
-  }, [user?.keycloakId, user?.entreprisePublicId]);
+  }, [user?.entreprisePublicId, user?.keycloakId]);
 
   // Initialize charts after data is loaded
   useEffect(() => {
@@ -106,7 +106,7 @@ export function FournisseurDashboard() {
       series: dashboardData.projectStatus.series,
       labels: dashboardData.projectStatus.labels,
       chart: { type: 'donut', height: 280 },
-      colors: ['#3B82F6', '#FBBF24', '#60A5FA', '#34D399'], // Blue, Yellow, Light Blue, Green
+      colors: ['#3B82F6', '#FBBF24', '#34D399', '#EF4444'], // Blue, Yellow, Green, Red
       legend: { position: 'right', fontSize: '13px', markers: { radius: 12 }, itemMargin: { vertical: 8 } },
       dataLabels: { enabled: false },
       stroke: { show: true, width: 4, colors: ['#fff'] },
@@ -135,10 +135,10 @@ export function FournisseurDashboard() {
         return '#3B82F6';
       case 'en_cours':
         return '#FBBF24';
-      case 'envoye':
-        return '#60A5FA';
       case 'termine':
         return '#34D399';
+      case 'refuse':
+        return '#EF4444';
       default:
         return '#6B7280';
     }
@@ -150,12 +150,10 @@ export function FournisseurDashboard() {
         return 'Nouveau';
       case 'en_cours':
         return 'En cours';
-      case 'envoye':
-        return 'Envoyé';
       case 'termine':
         return 'Terminé';
-      case 'expire':
-        return 'Expiré';
+      case 'refuse':
+        return 'Refusé';
       default:
         return status || 'Inconnu';
     }

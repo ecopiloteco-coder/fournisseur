@@ -27,7 +27,7 @@ export function DemandesChiffragePage() {
 
   const mapDemandes = useCallback((data: any[]) => data.map(d => ({
     id: d.id,
-    displayId: `PRJ-${d.projetId}`,
+    displayId: d.publicId || `PRJ-${d.projetId}`,
     cardRef: `MT - ${String(d.projetId || d.id || 0).padStart(3, '0')}`,
     name: d.nomProjet,
     creatorName: d.creeParNom || d.createdByName || d.creatorName || d.creePar || 'Inconnu',
@@ -48,8 +48,8 @@ export function DemandesChiffragePage() {
     }
     try {
       setIsLoading(true);
-      // Use same identifier priority as dashboard: keycloakId first (UUID), then entreprisePublicId
-      const userId = user.keycloakId || user.entreprisePublicId || String(user.entrepriseId);
+      // userEntreprise in backend maps to fournisseur entreprisePublicId
+      const userId = user.entreprisePublicId || user.keycloakId || String(user.entrepriseId);
       console.log('[Demandes] Loading with userId:', userId);
       const data = await fetchDemandesParEntreprise(userId);
       setProjects(mapDemandes(data));
